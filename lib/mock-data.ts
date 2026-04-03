@@ -31,7 +31,7 @@ export const mockRoadmaps: Roadmap[] = [
     milestones: [
       {
         id: "m1",
-        roadmap_uuid: "full-stack-dev",
+        roadmap_id: "full-stack-dev",
         milestone_id: "m1",
         order_index: 0,
         description: "Focus on React state management patterns",
@@ -47,15 +47,15 @@ export const mockRoadmaps: Roadmap[] = [
         need_modification: false,
         tasks: [
           {
-            id: "s1", skillpath_id: "s1", milestone_id: "m1", title: "React Context API Patterns", subtitle: "Fix your prop-drilling issue", status: "active", type: "learn", icon: "Play",
+            id: "s1", roadmap_id: "full-stack-dev", skillpath_id: "s1", milestone_id: "m1", title: "React Context API Patterns", subtitle: "Fix your prop-drilling issue", status: "active", type: "learn", icon: "Play",
             description: "Deep dive into Context providers", estimated_hours: 2, prerequisite_skillpath_ids: [], learning_objectives: ["Create and consume context"], need_generation: false, need_modification: false, affected_downstream_ids: []
           },
           {
-            id: "s2", skillpath_id: "s2", milestone_id: "m1", title: "The useReducer pattern", subtitle: "Manage complex state logic clearly", status: "upcoming", type: "practice", icon: "Target",
+            id: "s2", roadmap_id: "full-stack-dev", skillpath_id: "s2", milestone_id: "m1", title: "The useReducer pattern", subtitle: "Manage complex state logic clearly", status: "upcoming", type: "practice", icon: "Target",
             description: "Using reducers instead of state", estimated_hours: 4, prerequisite_skillpath_ids: ["s1"], learning_objectives: ["Write pure reducers"], need_generation: false, need_modification: false, affected_downstream_ids: []
           },
           {
-            id: "s3", skillpath_id: "s3", milestone_id: "m1", title: "Apply Context to Auth Flow", subtitle: "Project Integration", status: "upcoming", type: "apply", icon: "Code2",
+            id: "s3", roadmap_id: "full-stack-dev", skillpath_id: "s3", milestone_id: "m1", title: "Apply Context to Auth Flow", subtitle: "Project Integration", status: "upcoming", type: "apply", icon: "Code2",
             description: "Integrate with login flow", estimated_hours: 6, prerequisite_skillpath_ids: ["s2"], learning_objectives: ["Global auth state"], need_generation: false, need_modification: false, affected_downstream_ids: []
           }
         ],
@@ -67,7 +67,7 @@ export const mockRoadmaps: Roadmap[] = [
       },
       {
         id: "m2",
-        roadmap_uuid: "full-stack-dev",
+        roadmap_id: "full-stack-dev",
         milestone_id: "m2",
         order_index: 1,
         description: "Backend architecture and DB integration",
@@ -84,7 +84,7 @@ export const mockRoadmaps: Roadmap[] = [
         need_modification: false,
         tasks: [
           {
-            id: "s4", skillpath_id: "s4", milestone_id: "m2", title: "Node.js & Express Basics", subtitle: "REST API foundations", status: "upcoming", type: "learn", icon: "Map",
+            id: "s4", roadmap_id: "full-stack-dev", skillpath_id: "s4", milestone_id: "m2", title: "Node.js & Express Basics", subtitle: "REST API foundations", status: "upcoming", type: "learn", icon: "Map",
             description: "Backend setup", estimated_hours: 4, prerequisite_skillpath_ids: [], learning_objectives: ["API routes"], need_generation: false, need_modification: false, affected_downstream_ids: []
           }
         ]

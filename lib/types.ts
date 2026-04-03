@@ -31,6 +31,7 @@ export interface LearningProfile {
 export type SkillPathStatus = "ready" | "generated" | "revising" | "completed" | "revised" | "active" | "upcoming" | "review";
 
 export interface SkillPathItem {
+  roadmap_id: string;
   skillpath_id: string;
   milestone_id: string;
   title: string;
@@ -51,7 +52,7 @@ export interface SkillPathItem {
 export type MilestoneStatus = "ready" | "generated" | "revising" | "completed" | "revised" | "active" | "upcoming";
 
 export interface MilestoneItem {
-  roadmap_uuid: string;
+  roadmap_id: string;
   milestone_id: string;
   title: string;
   description: string;
