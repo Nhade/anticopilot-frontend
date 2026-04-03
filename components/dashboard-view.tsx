@@ -81,7 +81,7 @@ export function DashboardView() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-zinc-500">
-                      <Zap className="w-3 h-3" /> Active project iteration
+                      <Zap className="w-3 h-3" /> Active project milestone
                     </span>
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100 mb-1">Complete client auth loop</h3>
@@ -143,7 +143,7 @@ export function DashboardView() {
               <Target className="w-4 h-4 text-active" />
             </div>
             <div>
-              <div className="text-[10px] text-neutral-meta font-bold uppercase tracking-wider">Active roadmap</div>
+              <div className="text-[10px] text-neutral-meta font-bold uppercase tracking-wider">Active milestone</div>
               <div className="text-sm font-bold text-slate-900 dark:text-zinc-100">Auth & State</div>
             </div>
           </div>

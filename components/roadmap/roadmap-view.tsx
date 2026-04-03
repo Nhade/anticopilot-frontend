@@ -145,34 +145,66 @@ export function RoadmapView() {
         </div>
 
         {/* Milestones Sections */}
-        {activeRoadmap?.milestones?.map((milestone, idx) => (
-          <div key={milestone.id} id={milestone.id}>
-            <h3 className={cn(
-              "text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2",
-              milestone.status === "active" ? "text-review" : "text-neutral-meta"
-            )}>
-              {milestone.status === "active" ? <Flame className="w-4 h-4" /> : <Map className="w-4 h-4 opacity-60" />}
-              {milestone.status === "active" ? "Now" : "Next"}
-            </h3>
-            <div className="relative">
-              <div className={cn(
-                "absolute left-[31px] top-6 bottom-0 w-[2px] z-0",
-                milestone.status === "active" ? "bg-active/20" : "bg-slate-200 dark:bg-zinc-800"
-              )} />
-              <div className="space-y-6 relative z-10">
-                <ExpandableMilestone
-                  {...milestone}
-                  icon={React.createElement(iconMap[milestone.icon] || Map, { className: "w-6 h-6 text-white" })}
-                  tasks={milestone.tasks.map(t => ({
-                    ...t,
-                    icon: React.createElement(iconMap[t.icon || ""] || Play, { size: 14 })
-                  }))}
-                  onTaskClick={setSelectedTaskId}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
+        {(() => {
+          const nowMilestones = activeRoadmap?.milestones?.filter(m => m.status === 'active') || [];
+          const nextMilestones = activeRoadmap?.milestones?.filter(m => m.status !== 'active') || [];
+          
+          return (
+            <>
+              {nowMilestones.length > 0 && (
+                <div className="space-y-6">
+                  <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 text-review">
+                    <Flame className="w-4 h-4" /> Now
+                  </h3>
+                  <div className="relative">
+                    <div className="absolute left-[31px] top-6 bottom-0 w-[2px] z-0 bg-active/20" />
+                    <div className="space-y-8 relative z-10">
+                      {nowMilestones.map((milestone) => (
+                        <ExpandableMilestone
+                          key={milestone.id}
+                          id={milestone.id || ""}
+                          {...milestone}
+                          icon={React.createElement(iconMap[milestone.icon] || Map, { className: "w-6 h-6 text-white" })}
+                          tasks={milestone.tasks.map(t => ({
+                            ...t,
+                            icon: React.createElement(iconMap[t.icon || ""] || Play, { size: 14 })
+                          }))}
+                          onTaskClick={setSelectedTaskId}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {nextMilestones.length > 0 && (
+                <div className="space-y-6">
+                  <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 text-neutral-meta">
+                    <Map className="w-4 h-4 opacity-60" /> Next
+                  </h3>
+                  <div className="relative">
+                    <div className="absolute left-[31px] top-6 bottom-0 w-[2px] z-0 bg-slate-200 dark:bg-zinc-800" />
+                    <div className="space-y-8 relative z-10">
+                      {nextMilestones.map((milestone) => (
+                        <ExpandableMilestone
+                          key={milestone.id}
+                          id={milestone.id || ""}
+                          {...milestone}
+                          icon={React.createElement(iconMap[milestone.icon] || Map, { className: "w-6 h-6 text-white" })}
+                          tasks={milestone.tasks.map(t => ({
+                            ...t,
+                            icon: React.createElement(iconMap[t.icon || ""] || Play, { size: 14 })
+                          }))}
+                          onTaskClick={setSelectedTaskId}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
       </div>
     </div>

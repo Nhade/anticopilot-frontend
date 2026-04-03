@@ -3,7 +3,6 @@ import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useStore } from "@/lib/store";
-import { mockRoadmaps } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export function RoadmapSwitcher() {
@@ -12,10 +11,11 @@ export function RoadmapSwitcher() {
     setActiveRoadmapId, 
     isSwitcherOpen, 
     setSwitcherOpen, 
-    setActiveTab 
+    setActiveTab,
+    roadmaps
   } = useStore();
   
-  const activeRoadmap = mockRoadmaps.find(r => r.id === activeRoadmapId);
+  const activeRoadmap = roadmaps.find(r => r.id === activeRoadmapId);
 
   return (
     <div className="relative">
@@ -42,7 +42,7 @@ export function RoadmapSwitcher() {
             </div>
             
             {/* Active List */}
-            {mockRoadmaps.filter(r => r.id === activeRoadmapId).map(roadmap => (
+            {roadmaps.filter(r => r.id === activeRoadmapId).map(roadmap => (
               <div 
                 key={roadmap.id}
                 className="p-3 rounded-xl bg-[#0a6879]/5 border border-[#0a6879]/20 cursor-pointer hover:bg-[#0a6879]/10 transition-colors"
@@ -65,7 +65,7 @@ export function RoadmapSwitcher() {
 
           <div className="p-2 space-y-1">
             {/* Other roadmaps */}
-            {mockRoadmaps.filter(r => r.id !== activeRoadmapId).map(roadmap => (
+            {roadmaps.filter(r => r.id !== activeRoadmapId).map(roadmap => (
               <div 
                 key={roadmap.id}
                 className="p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900/50 cursor-pointer transition-colors"

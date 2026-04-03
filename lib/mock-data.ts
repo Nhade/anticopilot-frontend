@@ -1,4 +1,5 @@
 import { User, Roadmap, Task, Milestone } from "./types";
+export type { User, Roadmap, Task, Milestone };
 
 export const mockUser: User = {
   name: "Alex",
@@ -9,6 +10,11 @@ export const mockUser: User = {
 export const mockRoadmaps: Roadmap[] = [
   {
     id: "full-stack-dev",
+    roadmap_id: "full-stack-dev",
+    version: 1,
+    summary: "Mastering React, Node, and Postgres for modern app development.",
+    assumptions: ["Fast-track preferred", "Prior JS knowledge"],
+    target_outcome: "Build a production-ready task manager",
     title: "Full-Stack Dev",
     status: "Active",
     description: "Mastering React, Node, and Postgres for modern app development.",
@@ -25,15 +31,33 @@ export const mockRoadmaps: Roadmap[] = [
     milestones: [
       {
         id: "m1",
+        roadmap_uuid: "full-stack-dev",
+        milestone_id: "m1",
+        order_index: 0,
+        description: "Focus on React state management patterns",
+        objective: "Handle complex state safely",
+        estimated_hours: 12,
+        dependency_titles: [],
+        prerequisite_milestone_ids: [],
         status: "active",
         title: "Advanced State Management",
         eta: "~3 days at your pace",
         icon: "Map",
         why: "Your 'Task Manager' project needs to share user authentication state across deeply nested components. We're skipping generic Redux and jumping straight to React Context + Reducers because it elegantly solves your exact problem.",
+        need_modification: false,
         tasks: [
-          { title: "React Context API Patterns", subtitle: "Fix your prop-drilling issue", status: "active", type: "learn", icon: "Play" },
-          { title: "The useReducer pattern", subtitle: "Manage complex state logic clearly", status: "upcoming", type: "practice", icon: "Target" },
-          { title: "Apply Context to Auth Flow", subtitle: "Project Integration", status: "upcoming", type: "apply", icon: "Code2" }
+          {
+            id: "s1", skillpath_id: "s1", milestone_id: "m1", title: "React Context API Patterns", subtitle: "Fix your prop-drilling issue", status: "active", type: "learn", icon: "Play",
+            description: "Deep dive into Context providers", estimated_hours: 2, prerequisite_skillpath_ids: [], learning_objectives: ["Create and consume context"], need_generation: false, need_modification: false, affected_downstream_ids: []
+          },
+          {
+            id: "s2", skillpath_id: "s2", milestone_id: "m1", title: "The useReducer pattern", subtitle: "Manage complex state logic clearly", status: "upcoming", type: "practice", icon: "Target",
+            description: "Using reducers instead of state", estimated_hours: 4, prerequisite_skillpath_ids: ["s1"], learning_objectives: ["Write pure reducers"], need_generation: false, need_modification: false, affected_downstream_ids: []
+          },
+          {
+            id: "s3", skillpath_id: "s3", milestone_id: "m1", title: "Apply Context to Auth Flow", subtitle: "Project Integration", status: "upcoming", type: "apply", icon: "Code2",
+            description: "Integrate with login flow", estimated_hours: 6, prerequisite_skillpath_ids: ["s2"], learning_objectives: ["Global auth state"], need_generation: false, need_modification: false, affected_downstream_ids: []
+          }
         ],
         sideQuest: {
           title: "Optional Side Quest",
@@ -43,34 +67,29 @@ export const mockRoadmaps: Roadmap[] = [
       },
       {
         id: "m2",
+        roadmap_uuid: "full-stack-dev",
+        milestone_id: "m2",
+        order_index: 1,
+        description: "Backend architecture and DB integration",
+        objective: "Connect to database",
+        estimated_hours: 20,
+        dependency_titles: ["Advanced State Management"],
+        prerequisite_milestone_ids: ["m1"],
         status: "upcoming",
         title: "Database & APIs",
         subtitle: "Connecting your React application to Prisma and transitioning your route logic.",
         eta: "~1.5 weeks at your pace",
         icon: "Code2",
+        why: "Connect frontend to backend",
+        need_modification: false,
         tasks: [
-          { title: "Node.js & Express Basics", subtitle: "REST API foundations", status: "upcoming", type: "learn", icon: "Map" },
-          { title: "Prisma Schema Modeling", subtitle: "Define your User and Task models", status: "upcoming", type: "practice", icon: "Target" },
-          { title: "Connecting UI to backend", subtitle: "React Query integration", status: "upcoming", type: "apply", icon: "Code2" }
+          {
+            id: "s4", skillpath_id: "s4", milestone_id: "m2", title: "Node.js & Express Basics", subtitle: "REST API foundations", status: "upcoming", type: "learn", icon: "Map",
+            description: "Backend setup", estimated_hours: 4, prerequisite_skillpath_ids: [], learning_objectives: ["API routes"], need_generation: false, need_modification: false, affected_downstream_ids: []
+          }
         ]
       }
     ]
-  },
-  {
-    id: "typescript-mastery",
-    title: "TypeScript Mastery",
-    status: "Paused",
-    description: "Leveling up from `any` to strict generic architectures.",
-    stats: { reviewsDue: 0, pace: "2h/wk", lastActive: "Sep 12" },
-    milestone: "Utility Types",
-    progress: 30,
-    linkedProject: null,
-    icon: "Code2",
-    iconColor: "text-slate-500",
-    iconBg: "bg-slate-100 dark:bg-zinc-800",
-    themeStatus: "Paused",
-    borderTheme: "border-slate-200 dark:border-zinc-800/60 hover:border-slate-300 dark:hover:border-zinc-700 shadow-sm dark:shadow-none",
-    bgTheme: "bg-white/40 dark:bg-zinc-900/40 border"
   }
 ];
 

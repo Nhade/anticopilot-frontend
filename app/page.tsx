@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect } from "react";
 import { useTheme } from "next-themes";
@@ -56,7 +56,12 @@ export default function DashboardPage() {
 
       if (element && contentRef.current) {
         const container = contentRef.current;
-        const targetScrollTop = element.offsetTop - 120 + (element.clientHeight / 2);
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+
+        // Calculate position relative to container
+        const relativeTop = elementRect.top - containerRect.top;
+        const targetScrollTop = relativeTop + container.scrollTop - 68; // "NOW" label has 20px height + two 24px margin
 
         container.scrollTo({
           top: Math.max(0, targetScrollTop),

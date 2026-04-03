@@ -20,8 +20,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RoadmapTaskItem } from "./roadmap-task-item";
 
+import { MilestoneStatus } from "@/lib/types";
+
 interface ExpandableMilestoneProps {
-  status: "active" | "completed" | "upcoming";
+  id: string;
+  status: MilestoneStatus;
   title: string;
   subtitle?: string;
   icon: React.ReactNode;
@@ -39,6 +42,7 @@ interface ExpandableMilestoneProps {
 }
 
 export function ExpandableMilestone({
+  id,
   status,
   title,
   subtitle,
@@ -81,14 +85,14 @@ export function ExpandableMilestone({
   };
 
   return (
-    <div className="relative z-10 flex gap-4 sm:gap-6">
+    <div id={id} className="relative z-10 flex gap-4 sm:gap-6">
       <div className="flex flex-col items-center pt-1 shrink-0">
         <div className={cn(
           "w-16 h-16 rounded-full flex items-center justify-center shrink-0 z-10 shadow-sm transition-all duration-300 cursor-pointer hover:scale-105",
           isGenerating && "animate-pulse shadow-xl shadow-active/40",
-          isActive ? "bg-linear-to-br from-active to-active-foreground border-4 border-slate-50 dark:border-[#09090b] shadow-2xl shadow-active/40 ring-2 ring-active/20 ring-offset-2 ring-offset-slate-50 dark:ring-offset-[#09090b]" :
-            isCompleted ? "bg-success/15 dark:bg-success/10 border-4 border-slate-50 dark:border-[#09090b]" :
-              "bg-slate-100 dark:bg-zinc-900 border-4 border-slate-50 dark:border-[#09090b]"
+          isActive ? "bg-slate-50 dark:bg-[#09090b] bg-linear-to-br from-active to-active-foreground border-4 border-slate-50 dark:border-[#09090b] shadow-2xl shadow-active/40 ring-2 ring-active/20 ring-offset-2 ring-offset-slate-50 dark:ring-offset-[#09090b]" :
+            isCompleted ? "bg-slate-50 dark:bg-[#09090b] bg-success/15 dark:bg-success/10 border-4 border-slate-50 dark:border-[#09090b]" :
+              "bg-slate-50 dark:bg-[#09090b] bg-slate-100 dark:bg-zinc-900 border-4 border-slate-50 dark:border-[#09090b]"
         )} onClick={() => setIsOpen(!isOpen)}>
           {isGenerating ? <RefreshCcw className="w-6 h-6 text-active animate-spin" /> : icon}
         </div>
@@ -101,7 +105,7 @@ export function ExpandableMilestone({
           isActive ? "bg-white dark:bg-zinc-900/80 border-2 border-active/30 dark:border-active/50 shadow-xl shadow-active/10 p-5" :
             isOpen ? "bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800 p-5 shadow-sm" :
               "bg-transparent border border-transparent p-2 hover:bg-slate-100/50 dark:hover:bg-zinc-800/30"
-        )} onClick={() => !isOpen && setIsOpen(true)}>
+        )} onClick={() => setIsOpen(!isOpen)}>
 
           {(isActive || isGenerating) && <div className={cn("absolute top-0 right-0 w-64 h-64 bg-linear-to-bl from-active/10 to-transparent rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none transition-all duration-1000", isGenerating && "opacity-100 from-active/30")} />}
 
@@ -111,7 +115,7 @@ export function ExpandableMilestone({
               <div className="flex-1">
                 {isActive && (
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-active/10 text-active text-[10px] font-bold uppercase tracking-wider mb-2 border border-active/20">
-                    <Flame className="w-3 h-3 text-review" /> Current Milestone
+                    <Flame className="w-3 h-3 text-review" /> Active Milestone
                   </div>
                 )}
                 {!isActive && !isCompleted && (
@@ -184,7 +188,8 @@ export function ExpandableMilestone({
                       <div className={cn("space-y-2 transition-all duration-500", isGenerating && "blur-[2px] opacity-60 scale-[0.99]")}>
                         {tasks?.map((task: any, i: number) => (
                           <RoadmapTaskItem
-                            key={`${currentTitle}-${i}`}
+                            key={task.id || `${currentTitle}-${i}`}
+                            id={task.id}
                             icon={task.icon}
                             title={task.title}
                             subtitle={task.subtitle}

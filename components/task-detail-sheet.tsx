@@ -22,7 +22,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { TaskItem } from "@/components/task-item";
 import { useStore } from "@/lib/store";
-import { mockRoadmaps } from "@/lib/mock-data";
 
 const iconMap: Record<string, LucideIcon> = {
   Zap,
@@ -39,18 +38,23 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 export function TaskDetailSheet() {
-  const { selectedTaskId, setSelectedTaskId } = useStore();
+  const { selectedTaskId, setSelectedTaskId, roadmaps, activeRoadmapId } = useStore();
 
-  // Find the task in mock data
-  // In a real app, this would be a store selector or an API call
+  // Find the task in store data
   let task = null;
-  for (const roadmap of mockRoadmaps) {
+  for (const roadmap of roadmaps) {
     for (const milestone of roadmap.milestones || []) {
-      task = milestone.tasks.find(t => t.title === selectedTaskId);
+      task = milestone.tasks.find(t => t.title === selectedTaskId || t.id === selectedTaskId);
       if (task) break;
     }
     if (task) break;
   }
+
+  const handleOpenInVSCode = () => {
+    if (!selectedTaskId || !activeRoadmapId) return;
+    const uri = `vscode://anticopilot.anti-copilot/open-task?roadmapId=${activeRoadmapId}&taskId=${selectedTaskId}`;
+    window.location.href = uri;
+  };
 
   const IconComp = task?.icon ? iconMap[task.icon] || Target : Target;
 
@@ -64,7 +68,7 @@ export function TaskDetailSheet() {
               Active Task
             </span>
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-zinc-800/80">
-              <SheetTitle className="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100">{selectedTaskId}</SheetTitle>
+              <SheetTitle className="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100">{task?.title}</SheetTitle>
               <div className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-[10px] font-bold text-slate-600 dark:text-zinc-300 shadow-sm">
                 EST. 45M
               </div>
@@ -109,9 +113,22 @@ export function TaskDetailSheet() {
               <CheckCircle2 className="w-4 h-4 text-active" /> Acceptance Criteria
             </h4>
             <div className="space-y-3">
-              <TaskItem completed={true} text="Component structure matches design tokens" />
-              <TaskItem completed={false} text="State updates correctly handle async boundaries" active />
-              <TaskItem completed={false} text="Edge cases for missing data are covered" />
+              {task?.learning_objectives && task.learning_objectives.length > 0 ? (
+                task.learning_objectives.map((objective: string, idx: number) => (
+                  <TaskItem
+                    key={idx}
+                    completed={task.status === "completed"}
+                    text={objective}
+                    active={task.status === "active" && idx === 0}
+                  />
+                ))
+              ) : (
+                <>
+                  <TaskItem completed={true} text="Component structure matches design tokens" />
+                  <TaskItem completed={false} text="State updates correctly handle async boundaries" active />
+                  <TaskItem completed={false} text="Edge cases for missing data are covered" />
+                </>
+              )}
             </div>
           </div>
 
@@ -145,11 +162,15 @@ export function TaskDetailSheet() {
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 p-6 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-t border-slate-200 dark:border-zinc-800 shadow-[0_-10px_40px_rgba(0,0,0,0.04)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
-          <Button className="w-full bg-active hover:bg-active/90 text-white rounded-xl shadow-xl shadow-active/20 transition-all active:scale-95 flex items-center justify-center gap-2 h-12 text-base font-bold">
+          <Button
+            className="w-full bg-active hover:bg-active/90 text-white rounded-xl shadow-xl shadow-active/20 transition-all active:scale-95 flex items-center justify-center gap-2 h-12 text-base font-bold"
+            onClick={handleOpenInVSCode}
+          >
             <Code2 className="w-5 h-5" />
             Open in VS Code
           </Button>
         </div>
+
       </SheetContent>
     </Sheet>
   );

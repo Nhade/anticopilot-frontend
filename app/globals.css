@@ -40,6 +40,7 @@
 
   /* Semantic Colors - AntiCopilot */
   --active: oklch(0.492 0.091 198.337); /* Teal */
+  --active-foreground: oklch(0.35 0.07 198); /* Darker Teal for strong gradient balance */
   --review: oklch(0.685 0.156 50.378); /* Orange */
   --ai: oklch(0.537 0.162 271.839); /* Purple */
   --success: oklch(0.627 0.194 149.215); /* Green */
@@ -82,6 +83,7 @@
 
   /* Semantic Colors - AntiCopilot Dark */
   --active: oklch(0.78 0.08 198); /* Toned down Teal */
+  --active-foreground: oklch(0.55 0.10 198); /* Balanced Teal for dark mode gradient */
   --review: oklch(0.75 0.15 50); /* Orange */
   --ai: oklch(0.70 0.12 272); /* Toned down Purple */
   --success: oklch(0.75 0.15 150); /* Light Green */
@@ -129,6 +131,7 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   --color-active: oklch(from var(--active) l c h);
+  --color-active-foreground: oklch(from var(--active-foreground) l c h);
   --color-review: oklch(from var(--review) l c h);
   --color-ai: oklch(from var(--ai) l c h);
   --color-success: oklch(from var(--success) l c h);
