@@ -34,6 +34,7 @@ export default function DashboardPage() {
     setActiveTab,
     setSelectedTaskId,
     getActiveRoadmap,
+    fetchRoadmaps,
     user
   } = useStore();
 
@@ -44,7 +45,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    fetchRoadmaps();
+  }, [fetchRoadmaps]);
 
   const activeRoadmap = getActiveRoadmap();
 
