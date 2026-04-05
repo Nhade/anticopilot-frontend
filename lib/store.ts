@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { User, Roadmap, mockUser, mockRoadmaps } from './mock-data';
-import { GoalSpec, LearningProfile, RoadmapItem } from './types';
+import { GoalSpec, LearningProfile, RoadmapItem, ReviewConcept, GeneratedTask } from './types';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -29,6 +29,14 @@ interface AppState {
 
   // User Data
   user: User;
+
+  // Review State
+  dueReviews: ReviewConcept[];
+  allReviews: ReviewConcept[];
+  fetchDueReviews: () => Promise<void>;
+  fetchAllReviews: () => Promise<void>;
+  submitReviewGrade: (conceptId: string, grade: 1 | 2 | 3 | 4) => Promise<void>;
+  generateReviewTask: (conceptId: string) => Promise<GeneratedTask>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -153,6 +161,53 @@ export const useStore = create<AppState>((set, get) => ({
 
   // User Data Initial Load
   user: mockUser,
+
+  // Review State Defaults
+  dueReviews: [],
+  allReviews: [],
+  fetchDueReviews: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/reviews/due`);
+      if (!response.ok) throw new Error('Failed to fetch due reviews');
+      const data = await response.json();
+      set({ dueReviews: data });
+    } catch (error) {
+      console.error('Fetch due reviews error:', error);
+    }
+  },
+  fetchAllReviews: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/reviews/`);
+      if (!response.ok) throw new Error('Failed to fetch all reviews');
+      const data = await response.json();
+      set({ allReviews: data });
+    } catch (error) {
+      console.error('Fetch all reviews error:', error);
+    }
+  },
+  submitReviewGrade: async (conceptId, grade) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/reviews/${conceptId}/grade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grade })
+      });
+      if (!response.ok) throw new Error('Failed to submit review grade');
+      
+      set((state) => ({
+        dueReviews: state.dueReviews.filter(r => r.concept_id !== conceptId)
+      }));
+    } catch (error) {
+      console.error('Submit review grade error:', error);
+    }
+  },
+  generateReviewTask: async (conceptId) => {
+    const response = await fetch(`${API_BASE_URL}/v1/reviews/${conceptId}/generate-task`, {
+      method: 'POST'
+    });
+    if (!response.ok) throw new Error('Failed to generate review task');
+    return response.json();
+  },
 }));
 
 /**

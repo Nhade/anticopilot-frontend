@@ -112,3 +112,30 @@ export interface Roadmap extends RoadmapItem {
   bgTheme: string;
   milestones?: Milestone[];
 }
+
+export interface ReviewConcept {
+  concept_id: string;
+  source_type: "struggle_signal" | "skill_path";
+  source_ref_id: string;
+  concept_metadata: {
+    concept_name?: string;
+    misconception?: string;
+    language?: string;
+    description?: string;
+    concept?: string; // fallback for older entries
+  };
+  state: number;
+  due: string;
+  stability: number;
+  difficulty: number;
+  elapsed_days: number;
+  scheduled_days: number;
+  reps: number;
+  lapses: number;
+}
+
+export interface GeneratedTask {
+  task_type: string;
+  content: string;
+  solution: string;
+}

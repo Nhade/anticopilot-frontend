@@ -15,6 +15,7 @@ import {
   Moon,
   Target,
   Flame,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { DashboardView } from "@/components/dashboard-view";
 import { ManageRoadmapsView } from "@/components/roadmap/manage-roadmaps-view";
 import { RoadmapSwitcher } from "@/components/roadmap/roadmap-switcher";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
+import { PracticeView } from "@/components/practice-view";
 import { useStore } from "@/lib/store";
 
 export default function DashboardPage() {
@@ -95,6 +97,7 @@ export default function DashboardPage() {
           <nav className="space-y-1">
             <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
             <NavItem icon={<Map size={18} />} label="Roadmap" active={activeTab === "roadmap"} onClick={() => setActiveTab("roadmap")} />
+            <NavItem icon={<BookOpen size={18} />} label="Practice" active={activeTab === "practice"} onClick={() => setActiveTab("practice")} />
             <NavItem icon={<Code2 size={18} />} label="Projects" active={activeTab === "projects"} onClick={() => setActiveTab("projects")} />
             <NavItem icon={<Compass size={18} />} label="Explore Skill" active={activeTab === "explore"} onClick={() => setActiveTab("explore")} />
           </nav>
@@ -175,8 +178,9 @@ export default function DashboardPage() {
         <div ref={contentRef} className="flex-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-8 py-10 pb-12 scroll-smooth">
           {activeTab === "roadmap" && <RoadmapView />}
           {activeTab === "dashboard" && <DashboardView />}
+          {activeTab === "practice" && <PracticeView />}
           {activeTab === "manage-roadmaps" && <ManageRoadmapsView />}
-          {!["roadmap", "dashboard", "manage-roadmaps"].includes(activeTab) && <DashboardView />}
+          {!["roadmap", "dashboard", "practice", "manage-roadmaps"].includes(activeTab) && <DashboardView />}
         </div>
       </main>
 
