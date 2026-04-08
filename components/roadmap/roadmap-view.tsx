@@ -21,7 +21,6 @@ import { ContextCard } from "./context-card";
 import { AdaptationItem } from "./adaptation-item";
 import { ExpandableMilestone } from "./expandable-milestone";
 import { useStore } from "@/lib/store";
-import { mockNotifications, mockPathUpdates } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 const iconMap: Record<string, LucideIcon> = {
@@ -42,8 +41,31 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 export function RoadmapView() {
-  const { getActiveRoadmap, setSelectedTaskId } = useStore();
+  const { getActiveRoadmap, setSelectedTaskId, roadmapsLoading, roadmapsError, notifications, pathUpdates } = useStore();
   const activeRoadmap = getActiveRoadmap();
+
+  if (roadmapsLoading && !activeRoadmap?.milestones?.length) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-active border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-slate-500 dark:text-zinc-400">Loading roadmap...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (roadmapsError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3 max-w-sm">
+          <AlertTriangle className="w-8 h-8 text-review mx-auto" />
+          <p className="text-sm text-slate-500 dark:text-zinc-400">Could not load roadmap. The backend may be offline.</p>
+          <p className="text-xs text-slate-400 dark:text-zinc-500">{roadmapsError}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
@@ -79,7 +101,7 @@ export function RoadmapView() {
           <div className="relative">
             <div className="space-y-4 relative z-10">
               <div className="bg-white dark:bg-zinc-900/80 border border-amber-200/50 dark:border-amber-900/50 rounded-2xl p-5 shadow-sm">
-                {mockNotifications.map((note, idx) => (
+                {notifications.map((note, idx) => (
                   <div key={note.id} className={cn(
                     "flex flex-col sm:flex-row sm:items-center justify-between gap-4",
                     idx === 0 && "mb-4 pb-4 border-b border-amber-100 dark:border-amber-900/30"
@@ -129,7 +151,7 @@ export function RoadmapView() {
           </div>
           <div className="bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
             <div className="space-y-5">
-              {mockPathUpdates.map(update => {
+              {pathUpdates.map(update => {
                 const Icon = iconMap[update.type === "refresh" ? "RefreshCcw" : update.type === "skip" ? "GitPullRequest" : "Map"] || Map;
                 return (
                   <AdaptationItem

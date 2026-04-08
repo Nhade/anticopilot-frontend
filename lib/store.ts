@@ -1,8 +1,25 @@
 import { create } from 'zustand';
-import { User, Roadmap, mockUser, mockRoadmaps } from './mock-data';
-import { GoalSpec, LearningProfile, RoadmapItem, ReviewConcept, GeneratedTask } from './types';
+import { User, Roadmap, mockUser, mockRoadmaps, mockNotifications, mockPathUpdates } from './mock-data';
+import { GoalSpec, LearningProfile, ReviewConcept, GeneratedTask } from './types';
+import * as api from './api-client';
+import { transformFullRoadmap, transformRoadmapList } from './transforms';
 
-const API_BASE_URL = 'http://localhost:8000';
+export type GenerationStatus = 'idle' | 'generating' | 'complete' | 'error';
+
+export interface Notification {
+  id: number;
+  type: string;
+  title: string;
+  context: string;
+  rationale: string;
+}
+
+export interface PathUpdate {
+  id: number;
+  type: string;
+  time: string;
+  text: string;
+}
 
 interface AppState {
   // Navigation & UI
@@ -17,6 +34,14 @@ interface AppState {
   getActiveRoadmap: () => Roadmap | undefined;
   roadmaps: Roadmap[];
   setRoadmaps: (roadmaps: Roadmap[]) => void;
+
+  // Loading & Error State
+  roadmapsLoading: boolean;
+  roadmapsError: string | null;
+  reviewsLoading: boolean;
+  reviewsError: string | null;
+  generationStatus: GenerationStatus;
+  generationError: string | null;
 
   // Async Actions
   fetchRoadmaps: () => Promise<void>;
@@ -37,6 +62,10 @@ interface AppState {
   fetchAllReviews: () => Promise<void>;
   submitReviewGrade: (conceptId: string, grade: 1 | 2 | 3 | 4) => Promise<void>;
   generateReviewTask: (conceptId: string) => Promise<GeneratedTask>;
+
+  // Notifications & Path Updates (stub — will connect to real API later)
+  notifications: Notification[];
+  pathUpdates: PathUpdate[];
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -50,6 +79,14 @@ export const useStore = create<AppState>((set, get) => ({
   activeRoadmapId: 'full-stack-dev',
   roadmaps: mockRoadmaps,
   setRoadmaps: (roadmaps) => set({ roadmaps }),
+
+  // Loading & Error State Defaults
+  roadmapsLoading: false,
+  roadmapsError: null,
+  reviewsLoading: false,
+  reviewsError: null,
+  generationStatus: 'idle',
+  generationError: null,
 
   setActiveRoadmapId: (id) => {
     set({ activeRoadmapId: id, isSwitcherOpen: false });
@@ -67,32 +104,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   // Async Actions Implementation
   fetchRoadmaps: async () => {
+    set({ roadmapsLoading: true, roadmapsError: null });
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/roadmaps`);
-      if (!response.ok) throw new Error('Failed to fetch roadmaps');
-      const data = await response.json();
+      const data = await api.fetchRoadmaps();
+      const transformedRoadmaps = transformRoadmapList(data);
 
-      const transformedRoadmaps: Roadmap[] = data.map((r: any) => ({
-        ...r,
-        id: r.roadmap_id,
-        title: r.title,
-        status: 'Active',
-        description: r.summary,
-        stats: { reviewsDue: 0, pace: 'balanced pace', lastActive: 'Recently' },
-        milestone: 'Loading...',
-        progress: 0,
-        linkedProject: null,
-        icon: 'Target',
-        iconColor: 'text-active',
-        iconBg: 'bg-active/10',
-        themeStatus: 'Active',
-        borderTheme: 'border-active/30 dark:border-active/50 shadow-xl shadow-active/10',
-        bgTheme: 'bg-white dark:bg-zinc-900/80 border-2',
-        milestones: [] // Fetch details when selected
-      }));
+      set({ roadmaps: transformedRoadmaps, roadmapsLoading: false });
 
-      set({ roadmaps: transformedRoadmaps });
-      
       // If there are roadmaps but none is active, set the first one as active
       // Also, fetch details for the active roadmap immediately
       const currentActiveId = get().activeRoadmapId;
@@ -106,36 +124,30 @@ export const useStore = create<AppState>((set, get) => ({
       }
     } catch (error) {
       console.error('Fetch roadmaps error:', error);
+      set({ roadmapsLoading: false, roadmapsError: error instanceof Error ? error.message : 'Failed to fetch roadmaps' });
     }
   },
 
   fetchRoadmap: async (id: string) => {
+    set({ roadmapsLoading: true, roadmapsError: null });
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/roadmaps/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch roadmap');
-      const data = await response.json();
-
+      const data = await api.fetchRoadmapById(id);
       const transformedRoadmap = transformFullRoadmap(data);
 
       set((state) => ({
+        roadmapsLoading: false,
         roadmaps: state.roadmaps.map(r => r.id === id ? { ...r, ...transformedRoadmap } : r)
       }));
     } catch (error) {
       console.error('Fetch roadmap error:', error);
+      set({ roadmapsLoading: false, roadmapsError: error instanceof Error ? error.message : 'Failed to fetch roadmap' });
     }
   },
 
   generateRoadmap: async (goal, profile) => {
+    set({ generationStatus: 'generating', generationError: null });
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/goals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal_spec: goal, learning_profile: profile })
-      });
-
-      if (!response.ok) throw new Error('Failed to generate roadmap');
-      const data = await response.json();
-
+      const data = await api.createGoal(goal, profile);
       const transformedRoadmap = transformFullRoadmap(data);
       // Override title/description with the user's specific request
       transformedRoadmap.title = goal.title;
@@ -143,6 +155,7 @@ export const useStore = create<AppState>((set, get) => ({
       transformedRoadmap.stats.pace = profile.pace_preference + ' pace';
 
       set((state) => ({
+        generationStatus: 'complete',
         roadmaps: [...state.roadmaps, transformedRoadmap],
         activeRoadmapId: transformedRoadmap.id,
         activeTab: 'roadmap'
@@ -151,6 +164,7 @@ export const useStore = create<AppState>((set, get) => ({
       return transformedRoadmap.id;
     } catch (error) {
       console.error('Generate roadmap error:', error);
+      set({ generationStatus: 'error', generationError: error instanceof Error ? error.message : 'Failed to generate roadmap' });
       throw error;
     }
   },
@@ -166,34 +180,28 @@ export const useStore = create<AppState>((set, get) => ({
   dueReviews: [],
   allReviews: [],
   fetchDueReviews: async () => {
+    set({ reviewsLoading: true, reviewsError: null });
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/reviews/due`);
-      if (!response.ok) throw new Error('Failed to fetch due reviews');
-      const data = await response.json();
-      set({ dueReviews: data });
+      const data = await api.fetchDueReviews();
+      set({ dueReviews: data, reviewsLoading: false });
     } catch (error) {
       console.error('Fetch due reviews error:', error);
+      set({ reviewsLoading: false, reviewsError: error instanceof Error ? error.message : 'Failed to fetch reviews' });
     }
   },
   fetchAllReviews: async () => {
+    set({ reviewsLoading: true, reviewsError: null });
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/reviews/`);
-      if (!response.ok) throw new Error('Failed to fetch all reviews');
-      const data = await response.json();
-      set({ allReviews: data });
+      const data = await api.fetchAllReviews();
+      set({ allReviews: data, reviewsLoading: false });
     } catch (error) {
       console.error('Fetch all reviews error:', error);
+      set({ reviewsLoading: false, reviewsError: error instanceof Error ? error.message : 'Failed to fetch reviews' });
     }
   },
   submitReviewGrade: async (conceptId, grade) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/reviews/${conceptId}/grade`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade })
-      });
-      if (!response.ok) throw new Error('Failed to submit review grade');
-      
+      await api.submitGrade(conceptId, grade);
       set((state) => ({
         dueReviews: state.dueReviews.filter(r => r.concept_id !== conceptId)
       }));
@@ -202,50 +210,10 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   generateReviewTask: async (conceptId) => {
-    const response = await fetch(`${API_BASE_URL}/v1/reviews/${conceptId}/generate-task`, {
-      method: 'POST'
-    });
-    if (!response.ok) throw new Error('Failed to generate review task');
-    return response.json();
+    return api.generateTask(conceptId);
   },
-}));
 
-/**
- * Helper to transform backend detailed roadmap data into a frontend Roadmap structure.
- */
-function transformFullRoadmap(data: any): Roadmap {
-  const { roadmap, milestones, skillpaths } = data;
-  return {
-    ...roadmap,
-    id: roadmap.roadmap_id,
-    title: roadmap.title,
-    status: 'Active',
-    description: roadmap.summary,
-    stats: { reviewsDue: 0, pace: 'balanced pace', lastActive: 'Recently' },
-    milestone: milestones[0]?.title || 'Starting',
-    progress: 0,
-    linkedProject: null,
-    icon: 'Target',
-    iconColor: 'text-active',
-    iconBg: 'bg-active/10',
-    themeStatus: 'Active',
-    borderTheme: 'border-active/30 dark:border-active/50 shadow-xl shadow-active/10',
-    bgTheme: 'bg-white dark:bg-zinc-900/80 border-2',
-    milestones: milestones.map((m: any, idx: number) => ({
-      ...m,
-      id: m.milestone_id,
-      status: idx === 0 ? 'active' : 'ready',
-      icon: idx === 0 ? 'Flame' : 'Map',
-      tasks: (skillpaths || [])
-        .filter((s: any) => s.milestone_id === m.milestone_id)
-        .map((s: any) => ({
-          ...s,
-          id: s.skillpath_id,
-          title: s.title,
-          subtitle: s.description,
-          status: idx === 0 ? 'active' : 'ready',
-          icon: 'Play'
-        }))
-    }))
-  };
-}
+  // Notifications & Path Updates — currently mock, will connect to API
+  notifications: mockNotifications,
+  pathUpdates: mockPathUpdates,
+}));

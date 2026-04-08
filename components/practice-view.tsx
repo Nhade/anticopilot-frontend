@@ -8,7 +8,7 @@ import { formatDistanceToNow, isPast } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
 export function PracticeView() {
-  const { dueReviews, allReviews, fetchAllReviews, fetchDueReviews, generateReviewTask, submitReviewGrade } = useStore();
+  const { dueReviews, allReviews, fetchAllReviews, fetchDueReviews, generateReviewTask, submitReviewGrade, reviewsLoading, reviewsError } = useStore();
   const [loading, setLoading] = useState(false);
   const [currentTask, setCurrentTask] = useState<GeneratedTask | null>(null);
   const [showSolution, setShowSolution] = useState(false);
@@ -62,6 +62,25 @@ export function PracticeView() {
       </Badge>
     );
   };
+
+  if (reviewsLoading && allReviews.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4 pt-20">
+        <div className="w-8 h-8 border-2 border-active border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-slate-500 dark:text-zinc-400">Loading practice queue...</p>
+      </div>
+    );
+  }
+
+  if (reviewsError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4 pt-20">
+        <X className="w-10 h-10 text-red-400" />
+        <h2 className="text-lg font-semibold">Could not load reviews</h2>
+        <p className="text-sm text-slate-500 dark:text-zinc-400 text-center max-w-sm">{reviewsError}</p>
+      </div>
+    );
+  }
 
   if (allReviews.length === 0 && !currentTask) {
     return (

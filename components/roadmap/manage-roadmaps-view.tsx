@@ -47,7 +47,7 @@ const iconMap: Record<string, LucideIcon> = {
 export function ManageRoadmapsView() {
   const [activeFilter, setActiveFilter] = useState("Active");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { setActiveRoadmapId, activeRoadmapId, roadmaps } = useStore();
+  const { setActiveRoadmapId, activeRoadmapId, roadmaps, generationStatus, generationError } = useStore();
 
   const filteredRoadmaps = roadmaps.filter(r => r.status === activeFilter);
   const counts = {
@@ -71,12 +71,11 @@ export function ManageRoadmapsView() {
           <p className="text-slate-600 dark:text-zinc-400">Manage your learning paths and active goals.</p>
         </div>
         <div className="flex gap-3">
-          <Button 
+          <Button
             variant="outline"
             className="border-active/30 text-active hover:bg-active/5 rounded-xl px-5 font-bold"
+            disabled={generationStatus === 'generating'}
             onClick={async () => {
-              const pulse = document.getElementById("ai-pulse");
-              if (pulse) pulse.classList.remove("hidden");
               try {
                 await useStore.getState().generateRoadmap(
                   {
@@ -98,14 +97,19 @@ export function ManageRoadmapsView() {
                     overload_risk: "low"
                   }
                 );
-              } finally {
-                if (pulse) pulse.classList.add("hidden");
+              } catch {
+                // Error is captured in store.generationError
               }
             }}
           >
-            AI Generate PoC
-            <div id="ai-pulse" className="ml-2 w-2 h-2 bg-active rounded-full animate-ping hidden" />
+            {generationStatus === 'generating' ? 'Generating...' : 'AI Generate PoC'}
+            {generationStatus === 'generating' && (
+              <div className="ml-2 w-2 h-2 bg-active rounded-full animate-ping" />
+            )}
           </Button>
+          {generationError && (
+            <span className="text-xs text-red-500 self-center">{generationError}</span>
+          )}
           <Button className="bg-active hover:opacity-90 text-white shadow-md shadow-active/20 transition-transform sm:hover:scale-105 rounded-xl px-5 font-bold">
             + Create Roadmap
           </Button>
