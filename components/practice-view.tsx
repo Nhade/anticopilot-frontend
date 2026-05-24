@@ -202,10 +202,46 @@ export function PracticeView() {
   );
 }
 
+function reviewDisplayInfo(concept: ReviewConcept): {
+  label: string;
+  sourceLabel: string;
+  subtitle: string | null;
+  language?: string;
+  misconception?: string;
+} {
+  const metadata = concept.concept_metadata || {};
+  if (concept.source_type === 'skill_path') {
+    return {
+      label: metadata.title || 'Skill Path Review',
+      sourceLabel: contentTypeLabel(metadata.content_type) || 'Skill Path',
+      subtitle: metadata.description || null,
+    };
+  }
+  return {
+    label: metadata.concept_name || metadata.concept || 'Programming Concept',
+    sourceLabel: 'Weakness',
+    subtitle: null,
+    language: metadata.language && metadata.language !== 'unknown' ? metadata.language : undefined,
+    misconception: metadata.misconception,
+  };
+}
+
+function contentTypeLabel(type?: string): string | null {
+  if (!type) return null;
+  switch (type) {
+    case 'article':
+      return 'Article';
+    case 'coding_problem':
+      return 'Coding Problem';
+    case 'multiple_choice':
+      return 'Quiz';
+    default:
+      return type;
+  }
+}
+
 function ConceptCard({ concept, onStart, loading, isDue }: { concept: ReviewConcept, onStart: () => void, loading: boolean, isDue: boolean }) {
-  const metadata = concept.concept_metadata;
-  const conceptName = metadata.concept_name || metadata.concept || "Programming Concept";
-  const language = metadata.language;
+  const info = reviewDisplayInfo(concept);
   const dueTime = new Date(concept.due);
 
   return (
@@ -213,15 +249,18 @@ function ConceptCard({ concept, onStart, loading, isDue }: { concept: ReviewConc
       <div className="flex-1 min-w-0 mr-4">
         <div className="flex items-center gap-2 mb-1">
           <span className={`text-[10px] font-bold uppercase tracking-wider ${isDue ? 'text-active' : 'text-slate-400'}`}>
-            {concept.source_type === 'struggle_signal' ? 'Weakness' : 'Skill Path'}
+            {info.sourceLabel}
           </span>
-          {language && (
+          {info.language && (
             <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-slate-200 dark:border-zinc-800 font-mono">
-              {language.toUpperCase()}
+              {info.language.toUpperCase()}
             </Badge>
           )}
         </div>
-        <h3 className="text-base font-semibold truncate group-hover:text-active transition-colors">{conceptName}</h3>
+        <h3 className="text-base font-semibold truncate group-hover:text-active transition-colors">{info.label}</h3>
+        {info.subtitle && (
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 line-clamp-2">{info.subtitle}</p>
+        )}
         <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 dark:text-zinc-400">
           <div className="flex items-center gap-1">
             <Clock size={12} />
@@ -229,19 +268,19 @@ function ConceptCard({ concept, onStart, loading, isDue }: { concept: ReviewConc
           </div>
           <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-zinc-700" />
           <div>{concept.reps} reviews</div>
-          {metadata.misconception && (
+          {info.misconception && (
             <>
               <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-zinc-700" />
-              <div className="truncate italic max-w-[200px]" title={metadata.misconception}>
+              <div className="truncate italic max-w-[200px]" title={info.misconception}>
                 Targeting previous mistake
               </div>
             </>
           )}
         </div>
       </div>
-      
-      <Button 
-        onClick={onStart} 
+
+      <Button
+        onClick={onStart}
         disabled={loading}
         size="sm"
         variant={isDue ? "default" : "secondary"}

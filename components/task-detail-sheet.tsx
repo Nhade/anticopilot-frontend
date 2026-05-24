@@ -2,16 +2,15 @@ import React from "react";
 import {
   Zap,
   Target,
-  BrainCircuit,
   Code2,
   CheckCircle2,
-  MessageSquare,
   Wand2,
   Sparkles,
-  Play,
-  Map,
-  Clock,
-  LucideIcon
+  BookOpen,
+  HelpCircle,
+  Loader2,
+  ChevronRight,
+  AlertCircle,
 } from "lucide-react";
 import {
   Sheet,
@@ -22,41 +21,59 @@ import {
 import { Button } from "@/components/ui/button";
 import { TaskItem } from "@/components/task-item";
 import { useStore } from "@/lib/store";
-
-const iconMap: Record<string, LucideIcon> = {
-  Zap,
-  Target,
-  BrainCircuit,
-  Code2,
-  CheckCircle2,
-  MessageSquare,
-  Wand2,
-  Sparkles,
-  Play,
-  Map,
-  Clock
-};
+import { formatEstimatedTime } from "@/lib/format";
+import type { LearningContentItem } from "@/lib/types";
 
 export function TaskDetailSheet() {
-  const { selectedTaskId, setSelectedTaskId, roadmaps, activeRoadmapId } = useStore();
+  const {
+    selectedTaskId,
+    setSelectedTaskId,
+    roadmaps,
+    activeRoadmapId,
+    generateSkillpathContent,
+    contentGenerationStatus,
+    contentGenerationError,
+    pendingContentSkillpathId,
+    openLearningContent,
+  } = useStore();
 
-  // Find the task in store data
+  // Find the task in store data by skillpath ID (which transforms.ts sets as
+  // `id`). Title-based matching used to be a fallback but it allowed wrong-task
+  // matches on title collisions; all callers now pass the skillpath_id.
   let task = null;
   for (const roadmap of roadmaps) {
     for (const milestone of roadmap.milestones || []) {
-      task = milestone.tasks.find(t => t.title === selectedTaskId || t.id === selectedTaskId);
+      task = milestone.tasks.find(t => t.id === selectedTaskId);
       if (task) break;
     }
     if (task) break;
   }
 
   const handleOpenInVSCode = () => {
-    if (!selectedTaskId || !activeRoadmapId) return;
-    const uri = `vscode://anticopilot.anti-copilot/open-task?roadmapId=${activeRoadmapId}&taskId=${selectedTaskId}`;
+    const roadmapId = task?.roadmap_id || activeRoadmapId;
+    const skillpathId = task?.skillpath_id || task?.id;
+    if (!skillpathId || !roadmapId) return;
+    const uri = `vscode://anticopilot.anti-copilot/open-task?roadmapId=${encodeURIComponent(roadmapId)}&taskId=${encodeURIComponent(skillpathId)}`;
     window.location.href = uri;
   };
 
-  const IconComp = task?.icon ? iconMap[task.icon] || Target : Target;
+  const learningContents = (task?.learning_contents || []) as LearningContentItem[];
+  const hasContents = learningContents.length > 0;
+  const targetRoadmapId = task?.roadmap_id || activeRoadmapId;
+  const isGeneratingForThis =
+    contentGenerationStatus === 'generating' &&
+    pendingContentSkillpathId === (task?.skillpath_id || task?.id);
+
+  const handleGenerateContent = async () => {
+    if (!task || !targetRoadmapId) return;
+    const skillpathId = task.skillpath_id || task.id;
+    if (!skillpathId) return;
+    try {
+      await generateSkillpathContent(targetRoadmapId, skillpathId, { force: !task.need_generation });
+    } catch (err) {
+      console.error('Failed to generate skillpath content', err);
+    }
+  };
 
   return (
     <Sheet open={!!selectedTaskId} onOpenChange={(open) => !open && setSelectedTaskId(null)}>
@@ -67,18 +84,22 @@ export function TaskDetailSheet() {
               <Zap className="w-3.5 h-3.5" />
               Active Task
             </span>
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-zinc-800/80">
+            <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-zinc-800/80">
               <SheetTitle className="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100">{task?.title}</SheetTitle>
-              <div className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-[10px] font-bold text-slate-600 dark:text-zinc-300 shadow-sm">
-                EST. 45M
-              </div>
+              {task?.estimated_hours ? (
+                <div className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-[10px] font-bold text-slate-600 dark:text-zinc-300 shadow-sm whitespace-nowrap">
+                  EST. {formatEstimatedTime(task.estimated_hours).toUpperCase()}
+                </div>
+              ) : null}
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-500 border border-indigo-500/20 dark:border-indigo-500/30 text-[11px] font-bold shadow-xs">
-                <Sparkles className="w-3.5 h-3.5" />
-                Suggested because: recent auth work + stuck signal in AuthModal.tsx
+            {task?.practice_mode && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-500 border border-indigo-500/20 dark:border-indigo-500/30 text-[11px] font-bold shadow-xs">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Practice mode: {task.practice_mode.replace(/_/g, ' ')}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </SheetHeader>
 
@@ -88,76 +109,57 @@ export function TaskDetailSheet() {
               <Target className="w-4 h-4 text-active" /> Objective
             </h4>
             <p className="text-sm text-slate-600 dark:text-zinc-400 leading-relaxed">
-              {task?.subtitle || "Implement specific logic according to roadmap requirements."}
+              {task?.subtitle || task?.description || "No description available."}
             </p>
           </div>
 
-          <div>
-            <h4 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-zinc-100 mb-2">
-              <BrainCircuit className="w-4 h-4 text-active" /> Why it matters
-            </h4>
-            <p className="text-sm text-slate-600 dark:text-zinc-400 leading-relaxed">
-              This task is a critical step in mastering the current milestone. It unblocks further progress and solidifies core concepts discovered through your recent coding activity.
-            </p>
-          </div>
-
-          <div className="bg-slate-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-slate-200 dark:border-zinc-800">
-            <div className="text-xs font-bold text-slate-500/60 uppercase tracking-wider mb-2">Linked Project Context</div>
-            <div className="flex items-center gap-2 text-sm text-slate-900 dark:text-zinc-100 font-medium">
-              <Code2 className="w-4 h-4 text-slate-400" /> Task Manager App
-            </div>
-          </div>
-
-          <div>
-            <h4 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-zinc-100 mb-4">
-              <CheckCircle2 className="w-4 h-4 text-active" /> Acceptance Criteria
-            </h4>
-            <div className="space-y-3">
-              {task?.learning_objectives && task.learning_objectives.length > 0 ? (
-                task.learning_objectives.map((objective: string, idx: number) => (
+          {task?.learning_objectives && task.learning_objectives.length > 0 && (
+            <div>
+              <h4 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-zinc-100 mb-4">
+                <CheckCircle2 className="w-4 h-4 text-active" /> Learning Objectives
+              </h4>
+              <div className="space-y-3">
+                {task.learning_objectives.map((objective: string, idx: number) => (
                   <TaskItem
                     key={idx}
                     completed={task.status === "completed"}
                     text={objective}
                     active={task.status === "active" && idx === 0}
                   />
-                ))
-              ) : (
-                <>
-                  <TaskItem completed={true} text="Component structure matches design tokens" />
-                  <TaskItem completed={false} text="State updates correctly handle async boundaries" active />
-                  <TaskItem completed={false} text="Edge cases for missing data are covered" />
-                </>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="pt-6 border-t border-slate-100 dark:border-zinc-800/80">
-            <h4 className="flex items-center gap-2 text-xs font-bold text-slate-500/60 uppercase tracking-wider mb-4">
-              <Sparkles className="w-3.5 h-3.5" /> Agent Actions
+          <div>
+            <h4 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-zinc-100 mb-4">
+              <BookOpen className="w-4 h-4 text-active" /> Learning Content
             </h4>
-            <div className="grid grid-cols-1 gap-2">
-              <Button variant="outline" className="justify-start h-auto py-2.5 px-3 border-slate-200 dark:border-zinc-800 hover:bg-active/5 hover:text-active hover:border-active/30 group transition-all bg-transparent">
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-zinc-800 group-hover:bg-active/10 flex items-center justify-center transition-colors">
-                    <MessageSquare className="w-3.5 h-3.5 text-slate-500/60 group-hover:text-active" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-xs font-bold">Explain this task</div>
-                  </div>
-                </div>
-              </Button>
-              <Button variant="outline" className="justify-start h-auto py-2.5 px-3 border-slate-200 dark:border-zinc-800 hover:bg-active/5 hover:text-active hover:border-active/30 group transition-all bg-transparent">
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-zinc-800 group-hover:bg-active/10 flex items-center justify-center transition-colors">
-                    <Wand2 className="w-3.5 h-3.5 text-slate-500/60 group-hover:text-active" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-xs font-bold">Generate starter implementation</div>
-                  </div>
-                </div>
-              </Button>
-            </div>
+            {hasContents ? (
+              <div className="space-y-4">
+                {learningContents.map((content) => (
+                  <LearningContentCard
+                    key={content.content_id}
+                    content={content}
+                    onOpenLesson={(contentId) => {
+                      openLearningContent(contentId);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <GenerateContentPanel
+                onGenerate={handleGenerateContent}
+                isGenerating={isGeneratingForThis}
+                error={
+                  contentGenerationStatus === 'error' &&
+                  pendingContentSkillpathId === (task?.skillpath_id || task?.id)
+                    ? contentGenerationError
+                    : null
+                }
+                disabled={!task || !targetRoadmapId}
+              />
+            )}
           </div>
         </div>
 
@@ -174,4 +176,105 @@ export function TaskDetailSheet() {
       </SheetContent>
     </Sheet>
   );
+}
+
+function GenerateContentPanel({
+  onGenerate,
+  isGenerating,
+  error,
+  disabled,
+}: {
+  onGenerate: () => void;
+  isGenerating: boolean;
+  error: string | null;
+  disabled: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-300 dark:border-zinc-700 bg-slate-50/60 dark:bg-zinc-900/40 p-5 space-y-3">
+      <div className="flex items-start gap-3">
+        <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center flex-shrink-0">
+          <Wand2 className="w-4 h-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-slate-900 dark:text-zinc-100 mb-1">
+            No learning content yet
+          </div>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+            Generate an article, coding problem, or quiz for this skill path so you can start practicing.
+          </p>
+        </div>
+      </div>
+      {error && (
+        <div className="flex items-start gap-2 text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span className="break-words">{error}</span>
+        </div>
+      )}
+      <Button
+        onClick={onGenerate}
+        disabled={disabled || isGenerating}
+        className="w-full bg-purple-500 hover:bg-purple-500/90 text-white"
+      >
+        {isGenerating ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating…
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-4 h-4 mr-2" /> Generate Learning Content
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+function LearningContentCard({
+  content,
+  onOpenLesson,
+}: {
+  content: LearningContentItem;
+  onOpenLesson: (contentId: string) => void;
+}) {
+  const meta = contentTypeMeta(content.content_type);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenLesson(content.content_id)}
+      className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:border-active/40 hover:bg-active/[0.03] dark:hover:bg-active/[0.06] transition-colors group"
+    >
+      <div className={`w-9 h-9 rounded-lg ${meta.bg} ${meta.fg} flex items-center justify-center flex-shrink-0`}>
+        <meta.Icon className="w-4 h-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500/70">
+          {meta.label}
+        </div>
+        <div className="text-sm font-bold text-slate-900 dark:text-zinc-100 truncate">
+          {content.title}
+        </div>
+        {content.description && (
+          <div className="text-xs text-slate-500 dark:text-zinc-500 truncate mt-0.5">
+            {content.description}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-zinc-500 group-hover:text-active transition-colors shrink-0">
+        Open
+        <ChevronRight className="w-4 h-4" />
+      </div>
+    </button>
+  );
+}
+
+function contentTypeMeta(type: LearningContentItem['content_type']) {
+  switch (type) {
+    case 'article':
+      return { label: 'Article', Icon: BookOpen, bg: 'bg-active/10', fg: 'text-active' };
+    case 'coding_problem':
+      return { label: 'Coding Problem', Icon: Code2, bg: 'bg-orange-500/10', fg: 'text-orange-500' };
+    case 'multiple_choice':
+      return { label: 'Quiz', Icon: HelpCircle, bg: 'bg-purple-500/10', fg: 'text-purple-500' };
+  }
 }

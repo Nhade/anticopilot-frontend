@@ -184,8 +184,8 @@ export function RoadmapView() {
                       {nowMilestones.map((milestone) => (
                         <ExpandableMilestone
                           key={milestone.id}
-                          id={milestone.id || ""}
                           {...milestone}
+                          id={milestone.id || ""}
                           icon={React.createElement(iconMap[milestone.icon] || Map, { className: "w-6 h-6 text-white" })}
                           tasks={milestone.tasks.map(t => ({
                             ...t,
@@ -210,8 +210,8 @@ export function RoadmapView() {
                       {nextMilestones.map((milestone) => (
                         <ExpandableMilestone
                           key={milestone.id}
-                          id={milestone.id || ""}
                           {...milestone}
+                          id={milestone.id || ""}
                           icon={React.createElement(iconMap[milestone.icon] || Map, { className: "w-6 h-6 text-white" })}
                           tasks={milestone.tasks.map(t => ({
                             ...t,
@@ -232,4 +232,3 @@ export function RoadmapView() {
     </div>
   );
 }
-

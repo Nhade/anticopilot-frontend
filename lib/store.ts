@@ -1,10 +1,23 @@
 import { create } from 'zustand';
 import { User, Roadmap, mockUser, mockRoadmaps, mockNotifications, mockPathUpdates } from './mock-data';
-import { GoalSpec, LearningProfile, ReviewConcept, GeneratedTask } from './types';
+import { GoalSpec, LearningProfile, ReviewConcept, GeneratedTask, LearningContentItem, SkillPathItem } from './types';
 import * as api from './api-client';
-import { transformFullRoadmap, transformRoadmapList } from './transforms';
+import { createGoalResponseToRoadmapFull, transformFullRoadmap, transformRoadmapList } from './transforms';
+
+// NOTE: We previously wrapped this store in zustand's `persist` middleware to keep
+// `activeTab`, `activeContentId`, and `activeRoadmapId` across page reloads (so a user
+// resuming a lesson would land back in the Learn view). That caused hydration issues
+// with Next.js — first paint used the default values and the store re-hydrated after,
+// producing a visible flash. Reverted to in-memory state for now.
+//
+// To revisit when we have a real backend "where did I leave off" endpoint, or when we
+// adopt URL-based routing for the Learn view (?content=...). At that point either:
+//   1. Hydrate from the URL/server, or
+//   2. Re-introduce `persist` with `skipHydration: true` + a manual hydrate-on-mount
+//      effect that suspends initial render via a small client wrapper.
 
 export type GenerationStatus = 'idle' | 'generating' | 'complete' | 'error';
+export type ContentGenerationStatus = 'idle' | 'generating' | 'complete' | 'error';
 
 export interface Notification {
   id: number;
@@ -48,9 +61,37 @@ interface AppState {
   fetchRoadmap: (id: string) => Promise<void>;
   generateRoadmap: (goal: GoalSpec, profile: LearningProfile) => Promise<string>;
 
+  // Content Generation State
+  contentGenerationStatus: ContentGenerationStatus;
+  contentGenerationError: string | null;
+  pendingContentSkillpathId: string | null;
+  generateRoadmapContent: (roadmapId: string) => Promise<api.GenerateContentResponse>;
+  generateSkillpathContent: (
+    roadmapId: string,
+    skillpathId: string,
+    options?: { force?: boolean }
+  ) => Promise<api.GenerateContentResponse>;
+
+  // Skillpath status mutation (Mark complete, future validator)
+  updateSkillpathStatus: (
+    roadmapId: string,
+    skillpathId: string,
+    status: api.SkillpathBackendStatus
+  ) => Promise<void>;
+
   // Task Detail
   selectedTaskId: string | null;
   setSelectedTaskId: (taskId: string | null) => void;
+
+  // Learn View (lesson reader)
+  activeContentId: string | null;
+  setActiveContentId: (contentId: string | null) => void;
+  openLearningContent: (contentId: string) => void;
+  findLearningContent: (contentId: string) => {
+    content: LearningContentItem;
+    skillpath: SkillPathItem;
+    roadmapId: string;
+  } | undefined;
 
   // User Data
   user: User;
@@ -76,7 +117,10 @@ export const useStore = create<AppState>((set, get) => ({
   setSwitcherOpen: (open) => set({ isSwitcherOpen: open }),
 
   // Roadmap State
-  activeRoadmapId: 'full-stack-dev',
+  // Start empty; `fetchRoadmaps()` (called on mount in app/page.tsx) will pick
+  // the first real roadmap. Using the old `'full-stack-dev'` default caused a
+  // brief flash where the active id didn't match any roadmap in the list.
+  activeRoadmapId: '',
   roadmaps: mockRoadmaps,
   setRoadmaps: (roadmaps) => set({ roadmaps }),
 
@@ -144,11 +188,91 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  // Content Generation State Defaults
+  contentGenerationStatus: 'idle',
+  contentGenerationError: null,
+  pendingContentSkillpathId: null,
+
+  generateRoadmapContent: async (roadmapId) => {
+    set({
+      contentGenerationStatus: 'generating',
+      contentGenerationError: null,
+      pendingContentSkillpathId: null,
+    });
+    try {
+      const result = await api.generateRoadmapContent(roadmapId);
+      const transformedRoadmap = transformFullRoadmap(result.roadmap);
+      set((state) => ({
+        contentGenerationStatus: 'complete',
+        roadmaps: state.roadmaps.map((r) =>
+          r.id === roadmapId ? { ...r, ...transformedRoadmap } : r
+        ),
+      }));
+      return result;
+    } catch (error) {
+      console.error('Generate roadmap content error:', error);
+      const conflictIds =
+        error instanceof api.MultiplePendingSkillpathsError
+          ? error.pending_skillpath_ids[0] ?? null
+          : null;
+      set({
+        contentGenerationStatus: 'error',
+        contentGenerationError:
+          error instanceof Error ? error.message : 'Failed to generate content',
+        pendingContentSkillpathId: conflictIds,
+      });
+      throw error;
+    }
+  },
+
+  updateSkillpathStatus: async (roadmapId, skillpathId, status) => {
+    try {
+      const refreshed = await api.updateSkillpathStatus(roadmapId, skillpathId, status);
+      const transformed = transformFullRoadmap(refreshed);
+      set((state) => ({
+        roadmaps: state.roadmaps.map((r) =>
+          r.id === roadmapId ? { ...r, ...transformed } : r
+        ),
+      }));
+    } catch (error) {
+      console.error('Update skillpath status error:', error);
+      throw error;
+    }
+  },
+
+  generateSkillpathContent: async (roadmapId, skillpathId, options) => {
+    set({
+      contentGenerationStatus: 'generating',
+      contentGenerationError: null,
+      pendingContentSkillpathId: skillpathId,
+    });
+    try {
+      const result = await api.generateSkillpathContent(roadmapId, skillpathId, options);
+      const transformedRoadmap = transformFullRoadmap(result.roadmap);
+      set((state) => ({
+        contentGenerationStatus: 'complete',
+        pendingContentSkillpathId: null,
+        roadmaps: state.roadmaps.map((r) =>
+          r.id === roadmapId ? { ...r, ...transformedRoadmap } : r
+        ),
+      }));
+      return result;
+    } catch (error) {
+      console.error('Generate skillpath content error:', error);
+      set({
+        contentGenerationStatus: 'error',
+        contentGenerationError:
+          error instanceof Error ? error.message : 'Failed to generate skillpath content',
+      });
+      throw error;
+    }
+  },
+
   generateRoadmap: async (goal, profile) => {
     set({ generationStatus: 'generating', generationError: null });
     try {
       const data = await api.createGoal(goal, profile);
-      const transformedRoadmap = transformFullRoadmap(data);
+      const transformedRoadmap = transformFullRoadmap(createGoalResponseToRoadmapFull(data));
       // Override title/description with the user's specific request
       transformedRoadmap.title = goal.title;
       transformedRoadmap.description = goal.description;
@@ -172,6 +296,31 @@ export const useStore = create<AppState>((set, get) => ({
   // Task Detail Defaults
   selectedTaskId: null,
   setSelectedTaskId: (taskId) => set({ selectedTaskId: taskId }),
+
+  // Learn View Defaults
+  activeContentId: null,
+  setActiveContentId: (contentId) => set({ activeContentId: contentId }),
+  openLearningContent: (contentId) => {
+    set({ activeContentId: contentId, activeTab: 'learn', selectedTaskId: null });
+  },
+  findLearningContent: (contentId) => {
+    const { roadmaps } = get();
+    for (const roadmap of roadmaps) {
+      for (const milestone of roadmap.milestones || []) {
+        for (const task of milestone.tasks || []) {
+          const content = (task.learning_contents || []).find((c) => c.content_id === contentId);
+          if (content) {
+            return {
+              content,
+              skillpath: task,
+              roadmapId: roadmap.roadmap_id || roadmap.id,
+            };
+          }
+        }
+      }
+    }
+    return undefined;
+  },
 
   // User Data Initial Load
   user: mockUser,

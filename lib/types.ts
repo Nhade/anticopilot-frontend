@@ -30,8 +30,64 @@ export interface LearningProfile {
 
 export type SkillPathStatus = "ready" | "generated" | "revising" | "completed" | "revised" | "active" | "upcoming" | "review";
 
+export type LearningContentType = "article" | "coding_problem" | "multiple_choice";
+export type PracticeMode = "coding_problem" | "multiple_choice" | "either";
+export type CodingProblemDifficulty = "easy" | "medium" | "hard";
+
+export interface SourceLink {
+  title: string;
+  url: string;
+}
+
+export interface ContentSourceNote {
+  source: SourceLink;
+  note: string;
+}
+
+export interface MultipleChoiceOption {
+  option_id: string;
+  text: string;
+}
+
+interface BaseLearningContent {
+  content_id: string;
+  skillpath_id: string;
+  title: string;
+  description: string;
+}
+
+export interface ArticleLearningContent extends BaseLearningContent {
+  content_type: "article";
+  skill_intro: string;
+  reading_content: string;
+  references?: SourceLink[];
+  source_notes?: ContentSourceNote[];
+}
+
+export interface CodingProblemLearningContent extends BaseLearningContent {
+  content_type: "coding_problem";
+  prompt: string;
+  difficulty: CodingProblemDifficulty;
+  starter_code?: string | null;
+  expected_output?: string | null;
+  hints?: string[];
+}
+
+export interface MultipleChoiceLearningContent extends BaseLearningContent {
+  content_type: "multiple_choice";
+  question: string;
+  options: MultipleChoiceOption[];
+  correct_option_id: string;
+  explanation: string;
+}
+
+export type LearningContentItem =
+  | ArticleLearningContent
+  | CodingProblemLearningContent
+  | MultipleChoiceLearningContent;
+
 export interface SkillPathItem {
-  roadmap_id: string;
+  roadmap_id?: string;
   skillpath_id: string;
   milestone_id: string;
   title: string;
@@ -44,6 +100,8 @@ export interface SkillPathItem {
   need_modification: boolean;
   revision_reason?: string;
   affected_downstream_ids: string[];
+  practice_mode?: PracticeMode | null;
+  learning_contents?: LearningContentItem[];
   // Frontend helpers (not in backend entities but useful for UI)
   type?: "learn" | "practice" | "apply" | "optional";
   icon?: string;
@@ -70,6 +128,7 @@ export interface MilestoneItem {
 
 export interface RoadmapItem {
   roadmap_id: string;
+  title?: string;
   version: number;
   summary: string;
   assumptions: string[];
@@ -115,14 +174,20 @@ export interface Roadmap extends RoadmapItem {
 
 export interface ReviewConcept {
   concept_id: string;
+  user_id?: string;
   source_type: "struggle_signal" | "skill_path";
   source_ref_id: string;
   concept_metadata: {
+    // struggle_signal metadata
     concept_name?: string;
     misconception?: string;
     language?: string;
-    description?: string;
     concept?: string; // fallback for older entries
+    // skill_path metadata (seeded from generated learning content)
+    skillpath_id?: string;
+    content_type?: LearningContentType;
+    title?: string;
+    description?: string;
   };
   state: number;
   due: string;
