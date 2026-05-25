@@ -10,9 +10,30 @@ import { Button } from "@/components/ui/button";
 import { TaskItem } from "./task-item";
 import { ClockIcon } from "./icons";
 import { useStore } from "@/lib/store";
+import type { Task } from "@/lib/types";
 
 export function DashboardView() {
-  const { user, setSelectedTaskId } = useStore();
+  const { user, setSelectedTaskId, roadmaps, activeRoadmapId } = useStore();
+
+  const handleOpenInVSCode = () => {
+    const roadmap = roadmaps.find(r => r.id === activeRoadmapId);
+    if (!roadmap) return;
+    // After transformFullRoadmap, every milestone has `tasks` populated from
+    // the backend's `skillpaths`. No need to fall back to the raw shape.
+    let target: Task | undefined;
+    for (const m of roadmap.milestones || []) {
+      const candidates: Task[] = m.tasks ?? [];
+      target = candidates.find(t => t.status === 'active')
+        ?? candidates.find(t => t.status !== 'completed');
+      if (target) break;
+    }
+    if (!target) return;
+    const roadmapId = target.roadmap_id || roadmap.roadmap_id || activeRoadmapId;
+    const skillpathId = target.skillpath_id || target.id;
+    if (!skillpathId || !roadmapId) return;
+    const uri = `vscode://anticopilot.anti-copilot/open-task?roadmapId=${encodeURIComponent(roadmapId)}&taskId=${encodeURIComponent(skillpathId)}`;
+    window.location.href = uri;
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -81,7 +102,7 @@ export function DashboardView() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-zinc-500">
-                      <Zap className="w-3 h-3" /> Active project iteration
+                      <Zap className="w-3 h-3" /> Active project milestone
                     </span>
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100 mb-1">Complete client auth loop</h3>
@@ -105,7 +126,12 @@ export function DashboardView() {
                 <span className="text-xs text-slate-500 dark:text-zinc-500 flex items-center gap-1.5">
                   <ClockIcon size={13} /> Est. 25 min remaining
                 </span>
-                <Button variant="outline" size="sm" className="border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center gap-2 h-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center gap-2 h-8"
+                  onClick={handleOpenInVSCode}
+                >
                   <Code2 className="w-3.5 h-3.5" />
                   Open in VS Code
                 </Button>
@@ -143,7 +169,7 @@ export function DashboardView() {
               <Target className="w-4 h-4 text-active" />
             </div>
             <div>
-              <div className="text-[10px] text-neutral-meta font-bold uppercase tracking-wider">Active roadmap</div>
+              <div className="text-[10px] text-neutral-meta font-bold uppercase tracking-wider">Active milestone</div>
               <div className="text-sm font-bold text-slate-900 dark:text-zinc-100">Auth & State</div>
             </div>
           </div>

@@ -3,15 +3,17 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 interface RoadmapTaskItemProps {
+  id: string;
   icon: React.ReactNode;
   title: string;
   subtitle: string;
   status: "active" | "upcoming" | "completed" | "review";
   type?: "learn" | "practice" | "apply" | "optional";
-  onTaskClick?: (t: string) => void;
+  onTaskClick?: (id: string) => void;
 }
 
 export function RoadmapTaskItem({
+  id,
   icon,
   title,
   subtitle,
@@ -34,7 +36,7 @@ export function RoadmapTaskItem({
             : isReview ? "bg-amber-50/50 dark:bg-amber-950/10 border-amber-200/50 dark:border-amber-900/30"
               : "bg-slate-50/50 dark:bg-zinc-900/50 border-transparent hover:bg-slate-100 dark:hover:bg-zinc-800/80"
       )}
-      onClick={onTaskClick ? () => onTaskClick(title) : undefined}
+      onClick={onTaskClick ? () => onTaskClick(id) : undefined}
     >
       <div className={cn(
         "w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2",

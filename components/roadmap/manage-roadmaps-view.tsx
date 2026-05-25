@@ -35,7 +35,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useStore } from "@/lib/store";
-import { mockRoadmaps } from "@/lib/mock-data";
 
 const iconMap: Record<string, LucideIcon> = {
   Target,
@@ -48,14 +47,14 @@ const iconMap: Record<string, LucideIcon> = {
 export function ManageRoadmapsView() {
   const [activeFilter, setActiveFilter] = useState("Active");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { setActiveRoadmapId, activeRoadmapId } = useStore();
+  const { setActiveRoadmapId, activeRoadmapId, roadmaps, generationStatus, generationError } = useStore();
 
-  const filteredRoadmaps = mockRoadmaps.filter(r => r.status === activeFilter);
+  const filteredRoadmaps = roadmaps.filter(r => r.status === activeFilter);
   const counts = {
-    Active: mockRoadmaps.filter(r => r.status === "Active").length,
-    Paused: mockRoadmaps.filter(r => r.status === "Paused").length,
-    Completed: mockRoadmaps.filter(r => r.status === "Completed").length,
-    Archived: mockRoadmaps.filter(r => r.status === "Archived").length
+    Active: roadmaps.filter(r => r.status === "Active").length,
+    Paused: roadmaps.filter(r => r.status === "Paused").length,
+    Completed: roadmaps.filter(r => r.status === "Completed").length,
+    Archived: roadmaps.filter(r => r.status === "Archived").length
   };
 
   const getFilterClass = (filter: string) => {
@@ -71,9 +70,50 @@ export function ManageRoadmapsView() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">Roadmaps</h1>
           <p className="text-slate-600 dark:text-zinc-400">Manage your learning paths and active goals.</p>
         </div>
-        <Button className="bg-active hover:opacity-90 text-white shadow-md shadow-active/20 transition-transform sm:hover:scale-105 rounded-xl px-5 font-bold">
-          + Create Roadmap
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="border-active/30 text-active hover:bg-active/5 rounded-xl px-5 font-bold"
+            disabled={generationStatus === 'generating'}
+            onClick={async () => {
+              try {
+                await useStore.getState().generateRoadmap(
+                  {
+                    title: "Next.js App Router Mastery",
+                    description: "Moving from Pages to App Router with Server Components",
+                    target_outcome: "Build a production blog",
+                    deadline: "2024-12-31",
+                    criteria: ["SEO optimized", "Auth integrated"],
+                    constraints: ["Use Tailwind", "Deploy on Vercel"]
+                  },
+                  {
+                    baseline_level: "intermediate",
+                    prior_knowledges: ["React", "JavaScript"],
+                    weak_areas: ["Server Components", "Suspense"],
+                    pace_preference: "balanced",
+                    confidence_level: "medium",
+                    needs_recap: true,
+                    prefers_examples_first: true,
+                    overload_risk: "low"
+                  }
+                );
+              } catch {
+                // Error is captured in store.generationError
+              }
+            }}
+          >
+            {generationStatus === 'generating' ? 'Generating...' : 'AI Generate PoC'}
+            {generationStatus === 'generating' && (
+              <div className="ml-2 w-2 h-2 bg-active rounded-full animate-ping" />
+            )}
+          </Button>
+          {generationError && (
+            <span className="text-xs text-red-500 self-center">{generationError}</span>
+          )}
+          <Button className="bg-active hover:opacity-90 text-white shadow-md shadow-active/20 transition-transform sm:hover:scale-105 rounded-xl px-5 font-bold">
+            + Create Roadmap
+          </Button>
+        </div>
       </div>
 
       {/* Filters/Tabs */}

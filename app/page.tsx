@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect } from "react";
 import { useTheme } from "next-themes";
@@ -15,6 +15,7 @@ import {
   Moon,
   Target,
   Flame,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,10 @@ import { DashboardView } from "@/components/dashboard-view";
 import { ManageRoadmapsView } from "@/components/roadmap/manage-roadmaps-view";
 import { RoadmapSwitcher } from "@/components/roadmap/roadmap-switcher";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
+import { PracticeView } from "@/components/practice-view";
+import { LearnView } from "@/components/learn/learn-view";
 import { useStore } from "@/lib/store";
+import { formatEstimatedTime } from "@/lib/format";
 
 export default function DashboardPage() {
   const {
@@ -34,6 +38,9 @@ export default function DashboardPage() {
     setActiveTab,
     setSelectedTaskId,
     getActiveRoadmap,
+    fetchRoadmaps,
+    fetchRoadmap,
+    activeRoadmapId,
     user
   } = useStore();
 
@@ -44,9 +51,36 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    fetchRoadmaps();
+  }, [fetchRoadmaps]);
+
+  // Re-sync the active roadmap whenever the tab/window regains focus, so
+  // status changes made elsewhere (extension, other tabs, future validator)
+  // show up without a manual refresh. Cheap polling primitive; we can replace
+  // it with SSE later without changing any caller code.
+  useEffect(() => {
+    const handler = () => {
+      if (activeRoadmapId) {
+        fetchRoadmap(activeRoadmapId);
+      }
+    };
+    window.addEventListener("focus", handler);
+    return () => window.removeEventListener("focus", handler);
+  }, [activeRoadmapId, fetchRoadmap]);
 
   const activeRoadmap = getActiveRoadmap();
+  const isLearnMode = activeTab === "learn";
+
+  // Derive the currently-active milestone + skillpath for the breadcrumb chip.
+  // Prefer status === 'active'; otherwise fall back to the first non-completed entry
+  // so the breadcrumb stays meaningful when nothing is explicitly active yet.
+  const activeMilestone =
+    activeRoadmap?.milestones?.find((m) => m.status === "active") ??
+    activeRoadmap?.milestones?.find((m) => m.status !== "completed");
+  const activeSkillpath =
+    activeMilestone?.tasks?.find((t) => t.status === "active") ??
+    activeMilestone?.tasks?.find((t) => t.status !== "completed");
+  const activeSkillpathEta = formatEstimatedTime(activeSkillpath?.estimated_hours);
 
   // Scroll to active milestone when the breadcrumb is clicked
   useEffect(() => {
@@ -56,7 +90,12 @@ export default function DashboardPage() {
 
       if (element && contentRef.current) {
         const container = contentRef.current;
-        const targetScrollTop = element.offsetTop - 120 + (element.clientHeight / 2);
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+
+        // Calculate position relative to container
+        const relativeTop = elementRect.top - containerRect.top;
+        const targetScrollTop = relativeTop + container.scrollTop - 68; // "NOW" label has 20px height + two 24px margin
 
         container.scrollTo({
           top: Math.max(0, targetScrollTop),
@@ -74,45 +113,59 @@ export default function DashboardPage() {
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#36685c]/10 blur-[120px] pointer-events-none" />
 
       {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-200 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-xl hidden md:flex flex-col justify-between relative z-10 transition-colors duration-300">
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-active to-[#005c6b] flex items-center justify-center shadow-lg shadow-active/20">
+      <aside
+        className={cn(
+          "border-r border-slate-200 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-xl hidden md:flex flex-col justify-between relative z-10 transition-[width] duration-300 ease-out",
+          isLearnMode ? "w-16" : "w-64"
+        )}
+      >
+        <div className={cn(isLearnMode ? "p-3" : "p-6")}>
+          <div className={cn("flex items-center mb-10", isLearnMode ? "justify-center" : "gap-3")}>
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-active to-[#005c6b] flex items-center justify-center shadow-lg shadow-active/20 shrink-0">
               <BrainCircuit className="w-5 h-5 text-white" />
             </div>
-            <span className="font-semibold text-lg tracking-tight bg-clip-text text-transparent bg-linear-to-r from-slate-900 to-slate-600 dark:from-zinc-100 dark:to-zinc-400">
-              AntiCopilot
-            </span>
+            {!isLearnMode && (
+              <span className="font-semibold text-lg tracking-tight bg-clip-text text-transparent bg-linear-to-r from-slate-900 to-slate-600 dark:from-zinc-100 dark:to-zinc-400">
+                AntiCopilot
+              </span>
+            )}
           </div>
 
           <nav className="space-y-1">
-            <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
-            <NavItem icon={<Map size={18} />} label="Roadmap" active={activeTab === "roadmap"} onClick={() => setActiveTab("roadmap")} />
-            <NavItem icon={<Code2 size={18} />} label="Projects" active={activeTab === "projects"} onClick={() => setActiveTab("projects")} />
-            <NavItem icon={<Compass size={18} />} label="Explore Skill" active={activeTab === "explore"} onClick={() => setActiveTab("explore")} />
+            <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === "dashboard"} compact={isLearnMode} onClick={() => setActiveTab("dashboard")} />
+            <NavItem icon={<Map size={18} />} label="Roadmap" active={activeTab === "roadmap"} compact={isLearnMode} onClick={() => setActiveTab("roadmap")} />
+            <NavItem icon={<BookOpen size={18} />} label="Practice" active={activeTab === "practice"} compact={isLearnMode} onClick={() => setActiveTab("practice")} />
+            <NavItem icon={<Code2 size={18} />} label="Projects" active={activeTab === "projects"} compact={isLearnMode} onClick={() => setActiveTab("projects")} />
+            <NavItem icon={<Compass size={18} />} label="Explore Skill" active={activeTab === "explore"} compact={isLearnMode} onClick={() => setActiveTab("explore")} />
           </nav>
         </div>
 
-        <div className="p-6 space-y-6">
-          <div className="p-4 rounded-xl relative group overflow-hidden bg-linear-to-b from-slate-100 to-white dark:from-zinc-800/40 dark:to-zinc-900/40 border border-slate-200 dark:border-zinc-700/50 shadow-sm dark:shadow-inner">
-            <div className="absolute inset-0 bg-linear-to-tr from-active/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="flex items-center gap-3 mb-3 relative z-10">
-              <Flame className="w-5 h-5 text-review" />
-              <div className="text-sm font-medium">{user.streak} Day Streak!</div>
+        <div className={cn(isLearnMode ? "p-3 space-y-3" : "p-6 space-y-6")}>
+          {!isLearnMode && (
+            <div className="p-4 rounded-xl relative group overflow-hidden bg-linear-to-b from-slate-100 to-white dark:from-zinc-800/40 dark:to-zinc-900/40 border border-slate-200 dark:border-zinc-700/50 shadow-sm dark:shadow-inner">
+              <div className="absolute inset-0 bg-linear-to-tr from-active/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <Flame className="w-5 h-5 text-review" />
+                <div className="text-sm font-medium">{user.streak} Day Streak!</div>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 relative z-10">You're in the top 5% of consistent learners this week.</p>
             </div>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 relative z-10">You're in the top 5% of consistent learners this week.</p>
-          </div>
+          )}
 
-          <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9 border border-slate-200 dark:border-zinc-700">
+          <div className={cn("flex items-center", isLearnMode ? "justify-center" : "gap-3")}>
+            <Avatar className="h-9 w-9 border border-slate-200 dark:border-zinc-700" title={isLearnMode ? `${user.name} · ${user.level}` : undefined}>
               <AvatarImage src="https://i.pravatar.cc/150?u=a042581f4e29026704d" />
               <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 dark:text-zinc-100 truncate">{user.name}</p>
-              <p className="text-xs text-slate-500/60 truncate">{user.level}</p>
-            </div>
-            <Settings className="w-4 h-4 text-slate-500/60 hover:text-slate-600 dark:hover:text-zinc-300 cursor-pointer transition-colors" />
+            {!isLearnMode && (
+              <>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-zinc-100 truncate">{user.name}</p>
+                  <p className="text-xs text-slate-500/60 truncate">{user.level}</p>
+                </div>
+                <Settings className="w-4 h-4 text-slate-500/60 hover:text-slate-600 dark:hover:text-zinc-300 cursor-pointer transition-colors" />
+              </>
+            )}
           </div>
         </div>
       </aside>
@@ -141,35 +194,54 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* Compact Progress Rail */}
-        <div className="px-8 bg-slate-50/60 dark:bg-zinc-900/40 border-b border-slate-200/50 dark:border-zinc-800/30 flex items-center shadow-xs sticky top-20 z-10 backdrop-blur-md overflow-x-auto [&::-webkit-scrollbar]:hidden">
-          <div className="flex items-center text-[11px] font-medium h-10 w-full">
-            <div className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300 transition-colors cursor-pointer shrink-0" onClick={() => setActiveTab("roadmap")}>
-              <Map size={12} />
-              {activeRoadmap?.title}
-            </div>
-            <ChevronRight size={12} className="mx-2 text-slate-300 dark:text-zinc-700 shrink-0" />
-            <div className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300 transition-colors cursor-pointer shrink-0" onClick={() => { setActiveTab("roadmap"); setShouldScrollToMilestone(true); }}>
-              <Target size={12} />
-              {activeRoadmap?.milestone}
-            </div>
-            <ChevronRight size={12} className="mx-2 text-slate-300 dark:text-zinc-700 shrink-0" />
-            <div
-              className="flex items-center gap-1.5 text-active font-semibold shrink-0 cursor-pointer hover:underline underline-offset-4"
-              onClick={() => setSelectedTaskId("Secure Token Storage")}
-            >
-              <Code2 size={12} />
-              Secure Token Storage
+        {/* Compact Progress Rail — hidden in learn mode to maximize reading area */}
+        {!isLearnMode && (
+          <div className="px-8 bg-slate-50/60 dark:bg-zinc-900/40 border-b border-slate-200/50 dark:border-zinc-800/30 flex items-center shadow-xs sticky top-20 z-10 backdrop-blur-md overflow-x-auto [&::-webkit-scrollbar]:hidden">
+            <div className="flex items-center text-[11px] font-medium h-10 w-full">
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300 transition-colors cursor-pointer shrink-0" onClick={() => setActiveTab("roadmap")}>
+                <Map size={12} />
+                {activeRoadmap?.title}
+              </div>
+              <ChevronRight size={12} className="mx-2 text-slate-300 dark:text-zinc-700 shrink-0" />
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300 transition-colors cursor-pointer shrink-0" onClick={() => { setActiveTab("roadmap"); setShouldScrollToMilestone(true); }}>
+                <Target size={12} />
+                {activeMilestone?.title ?? activeRoadmap?.milestone}
+              </div>
+              {activeSkillpath && (
+                <>
+                  <ChevronRight size={12} className="mx-2 text-slate-300 dark:text-zinc-700 shrink-0" />
+                  <div
+                    className="flex items-center gap-1.5 text-active font-semibold shrink-0 cursor-pointer hover:underline underline-offset-4"
+                    onClick={() => setSelectedTaskId(activeSkillpath.skillpath_id || activeSkillpath.id)}
+                  >
+                    <Code2 size={12} />
+                    <span>{activeSkillpath.title}</span>
+                    {activeSkillpathEta && (
+                      <span className="text-slate-400 dark:text-zinc-600 font-normal pl-1">
+                        · {activeSkillpathEta}
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        </div>
+        )}
 
         {/* Scrollable Content */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-8 py-10 pb-12 scroll-smooth">
+        <div
+          ref={contentRef}
+          className={cn(
+            "flex-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth",
+            isLearnMode ? "p-0" : "px-8 py-10 pb-12"
+          )}
+        >
+          {activeTab === "learn" && <LearnView />}
           {activeTab === "roadmap" && <RoadmapView />}
           {activeTab === "dashboard" && <DashboardView />}
+          {activeTab === "practice" && <PracticeView />}
           {activeTab === "manage-roadmaps" && <ManageRoadmapsView />}
-          {!["roadmap", "dashboard", "manage-roadmaps"].includes(activeTab) && <DashboardView />}
+          {!["learn", "roadmap", "dashboard", "practice", "manage-roadmaps"].includes(activeTab) && <DashboardView />}
         </div>
       </main>
 
