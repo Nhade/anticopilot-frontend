@@ -46,23 +46,6 @@ export function PracticeView() {
     setLoading(false);
   };
 
-  const renderLanguageBadge = (language?: string) => {
-    if (!language) return null;
-    const colors: Record<string, string> = {
-      python: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-      typescript: "bg-blue-600/10 text-blue-600 border-blue-600/20",
-      javascript: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
-      go: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
-      rust: "bg-orange-700/10 text-orange-700 border-orange-700/20",
-    };
-
-    return (
-      <Badge variant="outline" className={`text-[10px] uppercase px-1.5 py-0 h-5 font-bold ${colors[language.toLowerCase()] || "bg-slate-500/10 text-slate-500"}`}>
-        {language}
-      </Badge>
-    );
-  };
-
   if (reviewsLoading && allReviews.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full space-y-4 pt-20">
