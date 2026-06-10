@@ -5,32 +5,34 @@ import { useTheme } from "next-themes";
 import {
   Code2,
   Map,
-  Compass,
+  Radio,
   LayoutDashboard,
   BrainCircuit,
   Settings,
-  Bell,
   ChevronRight,
   Sun,
   Moon,
   Target,
   Flame,
-  BookOpen,
+  GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { NavItem } from "@/components/nav-item";
+import { NotificationBell } from "@/components/notification-bell";
 import { RoadmapView } from "@/components/roadmap/roadmap-view";
 import { DashboardView } from "@/components/dashboard-view";
 import { ManageRoadmapsView } from "@/components/roadmap/manage-roadmaps-view";
 import { RoadmapSwitcher } from "@/components/roadmap/roadmap-switcher";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
-import { PracticeView } from "@/components/practice-view";
+import { PracticeView } from "@/components/practice/practice-view";
 import { LearnView } from "@/components/learn/learn-view";
+import { DiscoveryView } from "@/components/discovery/discovery-view";
 import { useStore } from "@/lib/store";
 import { formatEstimatedTime } from "@/lib/format";
+import { MarkdownInline } from "@/components/learn/markdown-content";
 
 export default function DashboardPage() {
   const {
@@ -69,7 +71,9 @@ export default function DashboardPage() {
   }, [activeRoadmapId, fetchRoadmap]);
 
   const activeRoadmap = getActiveRoadmap();
-  const isLearnMode = activeTab === "learn";
+  // Focus mode: full-attention views (lesson reader, discovery chat) collapse
+  // the sidebar and drop the dashboard chrome.
+  const isLearnMode = activeTab === "learn" || activeTab === "discovery";
 
   // Derive the currently-active milestone + skillpath for the breadcrumb chip.
   // Prefer status === 'active'; otherwise fall back to the first non-completed entry
@@ -134,9 +138,11 @@ export default function DashboardPage() {
           <nav className="space-y-1">
             <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === "dashboard"} compact={isLearnMode} onClick={() => setActiveTab("dashboard")} />
             <NavItem icon={<Map size={18} />} label="Roadmap" active={activeTab === "roadmap"} compact={isLearnMode} onClick={() => setActiveTab("roadmap")} />
-            <NavItem icon={<BookOpen size={18} />} label="Practice" active={activeTab === "practice"} compact={isLearnMode} onClick={() => setActiveTab("practice")} />
-            <NavItem icon={<Code2 size={18} />} label="Projects" active={activeTab === "projects"} compact={isLearnMode} onClick={() => setActiveTab("projects")} />
-            <NavItem icon={<Compass size={18} />} label="Explore Skill" active={activeTab === "explore"} compact={isLearnMode} onClick={() => setActiveTab("explore")} />
+            <NavItem icon={<Target size={18} />} label="Practice" active={activeTab === "practice"} compact={isLearnMode} onClick={() => setActiveTab("practice")} />
+            <NavItem icon={<GraduationCap size={18} />} label="Learn" active={activeTab === "learn"} compact={isLearnMode} onClick={() => setActiveTab("learn")} />
+            {/* Not built yet — kept visible but inert, per the design reference */}
+            <NavItem icon={<Code2 size={18} />} label="Projects" compact={isLearnMode} disabled />
+            <NavItem icon={<Radio size={18} />} label="Captures" compact={isLearnMode} disabled />
           </nav>
         </div>
 
@@ -187,10 +193,7 @@ export default function DashboardPage() {
                 {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="relative text-slate-500/60 hover:text-slate-900 dark:hover:text-zinc-100 rounded-full">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-active rounded-full border border-white dark:border-zinc-950" />
-            </Button>
+            <NotificationBell />
           </div>
         </header>
 
@@ -200,12 +203,12 @@ export default function DashboardPage() {
             <div className="flex items-center text-[11px] font-medium h-10 w-full">
               <div className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300 transition-colors cursor-pointer shrink-0" onClick={() => setActiveTab("roadmap")}>
                 <Map size={12} />
-                {activeRoadmap?.title}
+                <MarkdownInline>{activeRoadmap?.title ?? ""}</MarkdownInline>
               </div>
               <ChevronRight size={12} className="mx-2 text-slate-300 dark:text-zinc-700 shrink-0" />
               <div className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300 transition-colors cursor-pointer shrink-0" onClick={() => { setActiveTab("roadmap"); setShouldScrollToMilestone(true); }}>
                 <Target size={12} />
-                {activeMilestone?.title ?? activeRoadmap?.milestone}
+                <MarkdownInline>{activeMilestone?.title ?? activeRoadmap?.milestone ?? ""}</MarkdownInline>
               </div>
               {activeSkillpath && (
                 <>
@@ -215,7 +218,7 @@ export default function DashboardPage() {
                     onClick={() => setSelectedTaskId(activeSkillpath.skillpath_id || activeSkillpath.id)}
                   >
                     <Code2 size={12} />
-                    <span>{activeSkillpath.title}</span>
+                    <MarkdownInline>{activeSkillpath.title}</MarkdownInline>
                     {activeSkillpathEta && (
                       <span className="text-slate-400 dark:text-zinc-600 font-normal pl-1">
                         · {activeSkillpathEta}
@@ -237,11 +240,12 @@ export default function DashboardPage() {
           )}
         >
           {activeTab === "learn" && <LearnView />}
+          {activeTab === "discovery" && <DiscoveryView />}
           {activeTab === "roadmap" && <RoadmapView />}
           {activeTab === "dashboard" && <DashboardView />}
           {activeTab === "practice" && <PracticeView />}
           {activeTab === "manage-roadmaps" && <ManageRoadmapsView />}
-          {!["learn", "roadmap", "dashboard", "practice", "manage-roadmaps"].includes(activeTab) && <DashboardView />}
+          {!["learn", "discovery", "roadmap", "dashboard", "practice", "manage-roadmaps"].includes(activeTab) && <DashboardView />}
         </div>
       </main>
 

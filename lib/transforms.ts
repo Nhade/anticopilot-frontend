@@ -64,6 +64,17 @@ export function transformFullRoadmap(data: RoadmapFull): Roadmap {
     ?? sortedMilestones[0]?.title
     ?? 'Starting';
 
+  // Overall progress = completed skillpaths over all skillpaths — finer-grained
+  // than milestone count, and it moves as soon as a task is finished.
+  const allSkillpaths = sortedMilestones.flatMap((m: any) => m.skillpaths || []);
+  const completedSkillpaths = allSkillpaths.filter(
+    (s: any) => s.status === 'completed'
+  ).length;
+  const progress =
+    allSkillpaths.length > 0
+      ? Math.round((completedSkillpaths / allSkillpaths.length) * 100)
+      : 0;
+
   return {
     ...data,
     id: data.roadmap_id,
@@ -72,7 +83,7 @@ export function transformFullRoadmap(data: RoadmapFull): Roadmap {
     description: data.summary,
     stats: { reviewsDue: 0, pace: 'balanced pace', lastActive: 'Recently' },
     milestone: activeMilestoneTitle,
-    progress: 0,
+    progress,
     linkedProject: null,
     icon: 'Target',
     iconColor: 'text-active',
@@ -82,11 +93,22 @@ export function transformFullRoadmap(data: RoadmapFull): Roadmap {
     bgTheme: 'bg-white dark:bg-zinc-900/80 border-2',
     milestones: sortedMilestones.map((m: any) => {
       const isActiveMilestone = m.milestone_id === activeMilestoneId;
+      const skillpaths = m.skillpaths || [];
+      // The backend doesn't cascade skillpath completion up to the milestone,
+      // so 'completed' is derived the same way 'active' is: from the skillpaths.
+      const allSkillpathsDone =
+        skillpaths.length > 0 &&
+        skillpaths.every((s: any) => s.status === 'completed');
+      const status = isActiveMilestone
+        ? 'active'
+        : allSkillpathsDone
+        ? 'completed'
+        : m.status;
       return {
         ...m,
         id: m.milestone_id,
-        status: isActiveMilestone ? 'active' : m.status,
-        icon: isActiveMilestone ? 'Flame' : 'Map',
+        status,
+        icon: isActiveMilestone ? 'Flame' : status === 'completed' ? 'Award' : 'Map',
         tasks: (m.skillpaths || []).map((s: any) => ({
           ...s,
           roadmap_id: s.roadmap_id || data.roadmap_id,

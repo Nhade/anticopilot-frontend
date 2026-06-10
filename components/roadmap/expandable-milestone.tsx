@@ -7,18 +7,19 @@ import {
   Award,
   SlidersHorizontal,
   BrainCircuit,
-  Send,
   Compass,
   Clock,
   ArrowRight,
   Code2,
-  RefreshCcw,
-  Map,
-  Target
+  RefreshCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { MarkdownInline } from "@/components/learn/markdown-content";
 import { RoadmapTaskItem } from "./roadmap-task-item";
+import { useStore } from "@/lib/store";
+import { MilestoneCustomizationPayload } from "@/lib/api-client";
+import { formatEstimatedTime } from "@/lib/format";
 
 import { MilestoneStatus } from "@/lib/types";
 
@@ -30,6 +31,11 @@ interface ExpandableMilestoneProps {
   icon: React.ReactNode;
   why?: string;
   tasks: any[];
+  // Backend milestone fields, present via the {...milestone} spread in
+  // roadmap-view; used by the customize form.
+  roadmap_id?: string;
+  objective?: string;
+  estimated_hours?: number;
   sideQuest?: {
     title: string;
     type: string;
@@ -41,6 +47,9 @@ interface ExpandableMilestoneProps {
   onTaskClick?: (task: string) => void;
 }
 
+const editFieldClass =
+  "w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#0a6879] focus:ring-2 focus:ring-[#0a6879]/40 transition-all";
+
 export function ExpandableMilestone({
   id,
   status,
@@ -48,7 +57,10 @@ export function ExpandableMilestone({
   subtitle,
   icon,
   why,
-  tasks: defaultTasks,
+  tasks,
+  roadmap_id,
+  objective,
+  estimated_hours,
   sideQuest,
   mastery,
   masteryText,
@@ -57,31 +69,98 @@ export function ExpandableMilestone({
 }: ExpandableMilestoneProps) {
   const [isOpen, setIsOpen] = useState(status === "active");
   const [isEditing, setIsEditing] = useState(false);
-  const [chatInput, setChatInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Local state to simulate updates
-  const [tasks, setTasks] = useState(defaultTasks);
-  const [currentTitle, setCurrentTitle] = useState(title);
+  // Customize form state, seeded from the milestone each time the editor opens.
+  const [editTitle, setEditTitle] = useState("");
+  const [editObjective, setEditObjective] = useState("");
+  const [editHours, setEditHours] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [regenerate, setRegenerate] = useState(true);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const customizeMilestone = useStore((state) => state.customizeMilestone);
 
   const isActive = status === "active";
   const isCompleted = status === "completed";
 
-  const handleCustomizationRequest = (request: string) => {
+  // Where a click on Start/Resume should land: the task marked active, or the
+  // first one that isn't finished yet.
+  const nextTask =
+    tasks?.find((t: any) => t.status === "active") ??
+    tasks?.find((t: any) => t.status !== "completed");
+  const anyTaskCompleted = tasks?.some((t: any) => t.status === "completed") ?? false;
+  // Time remaining = the estimates of the tasks still open in this milestone.
+  const remainingEta = formatEstimatedTime(
+    tasks?.reduce(
+      (sum: number, t: any) =>
+        t.status === "completed" ? sum : sum + (t.estimated_hours ?? 0),
+      0
+    )
+  );
+  const milestoneEta = eta || formatEstimatedTime(estimated_hours);
+
+  const openEditor = () => {
+    setEditTitle(title);
+    setEditObjective(objective ?? "");
+    setEditHours(estimated_hours != null ? String(estimated_hours) : "");
+    setEditReason("");
+    setRegenerate(true);
+    setEditError(null);
+    setIsEditing(true);
+  };
+
+  const handleApply = async () => {
+    // Send only fields the user actually changed — the endpoint applies
+    // concrete fields verbatim and treats `instructions` as the why-record.
+    const payload: MilestoneCustomizationPayload = {
+      instructions: editReason.trim(),
+      mark_skillpaths_for_regeneration: regenerate,
+    };
+    const trimmedTitle = editTitle.trim();
+    if (trimmedTitle && trimmedTitle !== title) {
+      payload.title = trimmedTitle;
+    }
+    const trimmedObjective = editObjective.trim();
+    if (trimmedObjective && trimmedObjective !== (objective ?? "").trim()) {
+      payload.objective = trimmedObjective;
+    }
+    const hours = Number(editHours);
+    if (editHours.trim() && !Number.isNaN(hours) && hours > 0 && hours !== estimated_hours) {
+      payload.estimated_hours = hours;
+    }
+
+    if (
+      payload.title === undefined &&
+      payload.objective === undefined &&
+      payload.estimated_hours === undefined
+    ) {
+      setEditError("Change at least one field — the reason alone doesn't modify the milestone.");
+      return;
+    }
+
+    const roadmapId = roadmap_id || useStore.getState().activeRoadmapId;
+    if (!roadmapId) {
+      setEditError("No roadmap context available for this milestone.");
+      return;
+    }
+
     setIsEditing(false);
     setIsGenerating(true);
-    setChatInput("");
-
-    // Simulate AI regenerating the path
-    setTimeout(() => {
+    setEditError(null);
+    try {
+      const result = await customizeMilestone(roadmapId, id, payload);
+      if (!result.applied) {
+        // follow_up_required: backend wants something more concrete.
+        setEditError(result.message);
+        setIsEditing(true);
+      }
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "Failed to customize milestone");
+      setIsEditing(true);
+    } finally {
       setIsGenerating(false);
-      setTasks([
-        { title: "FastAPI Fundamentals", subtitle: "Python-based high-performance APIs", status: "upcoming", icon: <Map size={14} /> },
-        { title: "Pydantic Models", subtitle: "Data validation equivalent to Prisma", status: "upcoming", icon: <Target size={14} /> },
-        { title: "Wiring React to FastAPI", subtitle: "CORS and fetch integration", status: "upcoming", icon: <Code2 size={14} /> }
-      ]);
-      setCurrentTitle("Database & FastAPI");
-    }, 2000);
+    }
   };
 
   return (
@@ -123,10 +202,15 @@ export function ExpandableMilestone({
                     Up Next
                   </div>
                 )}
+                {isCompleted && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-success text-[10px] font-bold uppercase tracking-wider mb-1.5 border border-success/25">
+                    <Award className="w-3 h-3" /> Completed
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <h3 className={cn("text-xl font-bold flex items-center gap-2 transition-all", isActive ? "text-slate-900 dark:text-white" : isCompleted ? "text-slate-700 dark:text-zinc-300 line-through decoration-slate-300 dark:decoration-zinc-700" : "text-slate-800 dark:text-zinc-300")}>
-                    {currentTitle}
+                    <MarkdownInline>{title}</MarkdownInline>
                   </h3>
                   {isOpen && (
                     <Button variant="ghost" size="icon" className="h-6 w-6 sm:hidden" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}>
@@ -141,7 +225,7 @@ export function ExpandableMilestone({
                 </div>
 
                 {subtitle && !isOpen && (
-                  <p className="text-sm text-neutral-meta mt-1">{subtitle}</p>
+                  <p className="text-sm text-neutral-meta mt-1"><MarkdownInline>{subtitle}</MarkdownInline></p>
                 )}
               </div>
 
@@ -167,7 +251,7 @@ export function ExpandableMilestone({
                 {masteryText && (
                   <div className={cn("flex items-start gap-2 p-3 rounded-lg mb-4 text-xs font-medium border", mastery === "review" ? "bg-amber-50/50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-900/50" : "bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/50")}>
                     {mastery === "review" ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> : <Award className="w-4 h-4 shrink-0 mt-0.5" />}
-                    <p>{masteryText}</p>
+                    <p><MarkdownInline>{masteryText}</MarkdownInline></p>
                   </div>
                 )}
 
@@ -179,7 +263,7 @@ export function ExpandableMilestone({
                       <div className="flex items-center justify-between mb-2 px-1">
                         <h4 className="text-[11px] font-bold text-neutral-meta uppercase tracking-wider">Breakdown</h4>
                         {!isCompleted && !isEditing && !isGenerating && (
-                          <Button variant="ghost" size="sm" className="h-6 text-xs text-active hover:bg-active/10 px-2" onClick={() => setIsEditing(true)}>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs text-active hover:bg-active/10 px-2" onClick={openEditor}>
                             <SlidersHorizontal className="w-3 h-3 mr-1" /> Customize Path
                           </Button>
                         )}
@@ -188,7 +272,7 @@ export function ExpandableMilestone({
                       <div className={cn("space-y-2 transition-all duration-500", isGenerating && "blur-[2px] opacity-60 scale-[0.99]")}>
                         {tasks?.map((task: any, i: number) => (
                           <RoadmapTaskItem
-                            key={task.id || `${currentTitle}-${i}`}
+                            key={task.id || `${title}-${i}`}
                             id={task.id}
                             icon={task.icon}
                             title={task.title}
@@ -203,34 +287,72 @@ export function ExpandableMilestone({
                       {isEditing && (
                         <div className="mt-3 animate-in fade-in slide-in-from-top-2">
                           <div className="bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-3 shadow-inner">
-                            <div className="flex items-center gap-2 mb-2 text-xs text-slate-500 dark:text-zinc-400">
-                              <BrainCircuit className="w-3.5 h-3.5 text-[#0a6879] dark:text-[#98e3f5]" />
-                              Chat with AI to adjust this module
+                            <div className="flex items-center gap-2 mb-3 text-xs text-slate-500 dark:text-zinc-400">
+                              <SlidersHorizontal className="w-3.5 h-3.5 text-[#0a6879] dark:text-[#98e3f5]" />
+                              Customize this milestone
                             </div>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg pl-3 pr-10 py-2 text-sm focus:outline-none focus:border-[#0a6879] focus:ring-2 focus:ring-[#0a6879]/40 transition-all"
-                                placeholder='e.g., "Use FastAPI instead of Express"'
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && chatInput && handleCustomizationRequest(chatInput)}
-                                autoFocus
-                              />
-                              <Button
-                                size="icon"
-                                className="absolute right-1 top-1 bottom-1 h-auto w-8 bg-transparent text-active hover:bg-active/10"
-                                disabled={!chatInput}
-                                onClick={() => handleCustomizationRequest(chatInput)}
-                              >
-                                <Send className="w-4 h-4" />
+                            <div className="space-y-2.5">
+                              <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-meta block mb-1">Title</label>
+                                <input
+                                  type="text"
+                                  className={editFieldClass}
+                                  value={editTitle}
+                                  onChange={(e) => setEditTitle(e.target.value)}
+                                  autoFocus
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-meta block mb-1">Objective</label>
+                                <textarea
+                                  rows={2}
+                                  className={cn(editFieldClass, "resize-none")}
+                                  value={editObjective}
+                                  onChange={(e) => setEditObjective(e.target.value)}
+                                />
+                              </div>
+                              <div className="flex flex-wrap items-end gap-4">
+                                <div>
+                                  <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-meta block mb-1">Estimated hours</label>
+                                  <input
+                                    type="number"
+                                    min="0.5"
+                                    step="0.5"
+                                    className={cn(editFieldClass, "w-24")}
+                                    value={editHours}
+                                    onChange={(e) => setEditHours(e.target.value)}
+                                  />
+                                </div>
+                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-zinc-400 cursor-pointer pb-2.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={regenerate}
+                                    onChange={(e) => setRegenerate(e.target.checked)}
+                                    className="accent-[#0a6879]"
+                                  />
+                                  Mark tasks for content regeneration
+                                </label>
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-meta block mb-1">Reason (optional)</label>
+                                <input
+                                  type="text"
+                                  className={editFieldClass}
+                                  placeholder='Why this change? e.g. "Use FastAPI instead of Express"'
+                                  value={editReason}
+                                  onChange={(e) => setEditReason(e.target.value)}
+                                />
+                              </div>
+                            </div>
+                            {editError && <p className="text-xs text-red-500 mt-2">{editError}</p>}
+                            <div className="flex items-center gap-2 mt-3">
+                              <Button size="sm" className="bg-active hover:bg-active/90 text-white font-bold h-7 px-4" onClick={handleApply}>
+                                Apply changes
+                              </Button>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-400 hover:text-slate-600" onClick={() => setIsEditing(false)}>
+                                Cancel
                               </Button>
                             </div>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              <Button variant="outline" size="sm" className="h-6 text-[10px] bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:text-[#0a6879]" onClick={() => handleCustomizationRequest("More practical exercises")}>More hands-on</Button>
-                              <Button variant="outline" size="sm" className="h-6 text-[10px] bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:text-[#0a6879]" onClick={() => handleCustomizationRequest("Make it shorter")}>Fast-track</Button>
-                            </div>
-                            <Button variant="ghost" size="sm" className="absolute top-2 right-2 h-6 text-xs text-slate-400 hover:text-slate-600" onClick={() => setIsEditing(false)}>Cancel</Button>
                           </div>
                         </div>
                       )}
@@ -243,10 +365,10 @@ export function ExpandableMilestone({
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <h4 className="text-sm font-bold text-slate-900 dark:text-zinc-100">{sideQuest.title}</h4>
+                            <h4 className="text-sm font-bold text-slate-900 dark:text-zinc-100"><MarkdownInline>{sideQuest.title}</MarkdownInline></h4>
                             <span className="text-[9px] bg-ai/10 dark:bg-ai/20 text-ai px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">{sideQuest.type}</span>
                           </div>
-                          <p className="text-neutral-meta text-xs leading-snug">{sideQuest.description}</p>
+                          <p className="text-neutral-meta text-xs leading-snug"><MarkdownInline>{sideQuest.description}</MarkdownInline></p>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2 shrink-0">
                           <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-ai/5 dark:bg-ai/10 border border-ai/10 dark:border-ai/20 text-[10px] font-bold text-ai shadow-xs">
@@ -257,13 +379,21 @@ export function ExpandableMilestone({
                       </div>
                     )}
 
-                    {isActive && !isGenerating && (
+                    {isActive && !isGenerating && nextTask && (
                       <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 mt-2 border-t border-slate-100 dark:border-zinc-800/80 animate-in fade-in">
-                        <Button size="sm" className="w-full sm:w-auto px-6 bg-active hover:bg-active/90 text-white shadow-md shadow-active/25 hover:shadow-active/40 transition-all sm:hover:scale-105 rounded-lg font-bold">
-                          Start
+                        <Button
+                          size="sm"
+                          className="w-full sm:w-auto px-6 bg-active hover:bg-active/90 text-white shadow-md shadow-active/25 hover:shadow-active/40 transition-all sm:hover:scale-105 rounded-lg font-bold"
+                          onClick={() => onTaskClick?.(nextTask.id)}
+                        >
+                          {anyTaskCompleted ? "Resume" : "Start"}
                           <ArrowRight className="w-4 h-4 ml-1.5" />
                         </Button>
-                        <span className="text-xs text-slate-500 dark:text-zinc-500 font-medium">approx. 45 mins at your pace</span>
+                        {remainingEta && (
+                          <span className="text-xs text-slate-500 dark:text-zinc-500 font-medium">
+                            approx. {remainingEta} remaining at your pace
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -283,28 +413,34 @@ export function ExpandableMilestone({
                           <h4 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">Why now?</h4>
                         </div>
                         <p className="text-xs text-neutral-meta leading-relaxed">
-                          {why}
+                          <MarkdownInline>{why}</MarkdownInline>
                         </p>
                       </div>
                     )}
 
-                    <div className="pt-4 border-t border-slate-200/60 dark:border-zinc-800/60 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[11px] font-medium text-neutral-meta">
-                          <Code2 className="w-3.5 h-3.5" /> Project
-                        </div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-zinc-100">Task Manager App</div>
-                      </div>
-
-                      {eta && (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-[11px] font-medium text-neutral-meta">
-                            <Clock size={14} /> ETA
+                    {(milestoneEta || tasks?.length > 0) && (
+                      <div className="pt-4 border-t border-slate-200/60 dark:border-zinc-800/60 space-y-3">
+                        {tasks?.length > 0 && (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-[11px] font-medium text-neutral-meta">
+                              <Code2 className="w-3.5 h-3.5" /> Tasks
+                            </div>
+                            <div className="text-xs font-bold text-slate-900 dark:text-zinc-100">
+                              {tasks.filter((t: any) => t.status === "completed").length} of {tasks.length} done
+                            </div>
                           </div>
-                          <div className="text-xs font-bold text-slate-900 dark:text-zinc-100">{eta}</div>
-                        </div>
-                      )}
-                    </div>
+                        )}
+
+                        {milestoneEta && (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-[11px] font-medium text-neutral-meta">
+                              <Clock size={14} /> Estimated effort
+                            </div>
+                            <div className="text-xs font-bold text-slate-900 dark:text-zinc-100">{milestoneEta}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
