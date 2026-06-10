@@ -1,21 +1,33 @@
-import React from "react";
-import { ChevronDown } from "lucide-react";
+import React, { useEffect } from "react";
+import { ChevronDown, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { MarkdownInline } from "@/components/learn/markdown-content";
 
 export function RoadmapSwitcher() {
-  const { 
-    activeRoadmapId, 
-    setActiveRoadmapId, 
-    isSwitcherOpen, 
-    setSwitcherOpen, 
+  const {
+    activeRoadmapId,
+    setActiveRoadmapId,
+    isSwitcherOpen,
+    setSwitcherOpen,
     setActiveTab,
+    startDiscovery,
     roadmaps
   } = useStore();
   
   const activeRoadmap = roadmaps.find(r => r.id === activeRoadmapId);
+
+  // Milestone names and progress come from roadmap details; lazily load them
+  // for the list entries that haven't been opened yet.
+  useEffect(() => {
+    if (!isSwitcherOpen) return;
+    const { roadmaps: current, fetchRoadmap } = useStore.getState();
+    current
+      .filter((r) => !r.milestones || r.milestones.length === 0)
+      .forEach((r) => fetchRoadmap(r.id));
+  }, [isSwitcherOpen]);
 
   return (
     <div className="relative">
@@ -27,7 +39,7 @@ export function RoadmapSwitcher() {
         <div className="flex flex-col items-start">
           <span className="text-[11px] text-slate-500 font-medium leading-none">Active roadmap</span>
           <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100 leading-none mt-1.5 flex items-center gap-1.5">
-            {activeRoadmap?.title || "Select Roadmap"}
+            <MarkdownInline>{activeRoadmap?.title || "Select Roadmap"}</MarkdownInline>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </span>
         </div>
@@ -49,10 +61,10 @@ export function RoadmapSwitcher() {
                 onClick={() => setSwitcherOpen(false)}
               >
                 <div className="flex justify-between items-start mb-1">
-                  <h4 className="text-sm font-bold text-[#005c6b] dark:text-[#98e3f5]">{roadmap.title}</h4>
+                  <h4 className="text-sm font-bold text-[#005c6b] dark:text-[#98e3f5]"><MarkdownInline>{roadmap.title}</MarkdownInline></h4>
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#005c6b] text-white">Active</span>
                 </div>
-                <p className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-2">Milestone: {roadmap.milestone}</p>
+                <p className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-2">Milestone: <MarkdownInline>{roadmap.milestone}</MarkdownInline></p>
                 <div className="flex items-center justify-between mt-1">
                   <div className="flex-1 mr-3">
                     <Progress value={roadmap.progress} className="h-1 bg-[#0a6879]/10 dark:bg-[#0a6879]/20" />
@@ -72,10 +84,10 @@ export function RoadmapSwitcher() {
                 onClick={() => setActiveRoadmapId(roadmap.id)}
               >
                 <div className="flex justify-between items-start mb-1">
-                  <h4 className="text-sm font-semibold text-slate-700 dark:text-zinc-300">{roadmap.title}</h4>
+                  <h4 className="text-sm font-semibold text-slate-700 dark:text-zinc-300"><MarkdownInline>{roadmap.title}</MarkdownInline></h4>
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400">{roadmap.status}</span>
                 </div>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 mb-1">Milestone: {roadmap.milestone}</p>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 mb-1">Milestone: <MarkdownInline>{roadmap.milestone}</MarkdownInline></p>
                 {roadmap.stats.reviewsDue > 0 && (
                   <div className="text-[10px] text-amber-600 dark:text-amber-500 font-medium">{roadmap.stats.reviewsDue} concept needs review</div>
                 )}
@@ -84,8 +96,14 @@ export function RoadmapSwitcher() {
           </div>
 
           <div className="p-2 border-t border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-900/20 grid grid-cols-2 gap-2">
-            <Button variant="ghost" size="sm" className="text-xs text-[#0a6879] dark:text-[#98e3f5] hover:bg-[#0a6879]/10 justify-start h-8">
-              + Create New
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-[#0a6879] dark:text-[#98e3f5] hover:bg-[#0a6879]/10 justify-start h-8"
+              onClick={() => startDiscovery()}
+            >
+              <Sparkles className="w-3.5 h-3.5 mr-1" />
+              Create with AI
             </Button>
             <Button variant="ghost" size="sm" className="text-xs text-slate-600 dark:text-zinc-400 hover:bg-slate-200/50 dark:hover:bg-zinc-800/50 justify-end h-8" onClick={() => setActiveTab("manage-roadmaps")}>
               Manage All

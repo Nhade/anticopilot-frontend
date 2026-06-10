@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -45,6 +46,14 @@
   --ai: oklch(0.537 0.162 271.839); /* Purple */
   --success: oklch(0.627 0.194 149.215); /* Green */
   --neutral-meta: oklch(0.48 0 0); /* Slate-600 approx */
+
+  /* Mindful Architect surface system (DESIGN.md §4) */
+  --ink: #2e3335;            /* on_surface body text — never pure black */
+  --meta: #5b6166;           /* tertiary text, metadata */
+  --surface: #f9f9fa;        /* base page */
+  --surface-low: #f2f4f5;    /* section backgrounds */
+  --surface-lowest: #ffffff; /* cards */
+  --outline: #aeb3b5;        /* standard borders (use at 24–56% opacity) */
 }
 
 .dark {
@@ -88,11 +97,21 @@
   --ai: oklch(0.70 0.12 272); /* Toned down Purple */
   --success: oklch(0.75 0.15 150); /* Light Green */
   --neutral-meta: oklch(0.82 0 0); /* High contrast Slate for labels */
+
+  /* Mindful Architect surface system — dark */
+  --ink: #e8eaeb;
+  --meta: #969ca0;
+  --surface: #090a0c;
+  --surface-low: #141619;
+  --surface-lowest: #181a1d;
+  --outline: #303338;
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  /* DESIGN.md typography: Inter for body/UI, Manrope for display, JetBrains Mono for code */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -136,6 +155,19 @@
   --color-ai: oklch(from var(--ai) l c h);
   --color-success: oklch(from var(--success) l c h);
   --color-neutral-meta: oklch(from var(--neutral-meta) l c h);
+
+  --color-ink: var(--ink);
+  --color-meta: var(--meta);
+  --color-surface: var(--surface);
+  --color-surface-low: var(--surface-low);
+  --color-surface-lowest: var(--surface-lowest);
+  --color-outline: var(--outline);
+
+  /* Ambient shadows (DESIGN.md §5) */
+  --shadow-soft: 0 2px 8px -2px rgba(46, 51, 53, 0.08);
+  --shadow-card: 0 12px 32px -10px rgba(46, 51, 53, 0.12);
+  --shadow-lift: 0 18px 44px -14px rgba(46, 51, 53, 0.18);
+  --shadow-glow: 0 8px 28px -8px rgba(10, 104, 121, 0.35);
 }
 
 @layer base {
@@ -158,4 +190,39 @@
 }
 *::-webkit-scrollbar {
   display: none !important;
+}
+
+/* Entrance animations (Practice/Learn redesign).
+   fadeUp is transform-only on purpose: an opacity:0 first frame blanks
+   DOM-clone screenshots/exports. */
+@keyframes ac-fade-up {
+  from { transform: translateY(16px); }
+  to { transform: none; }
+}
+@keyframes ac-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ac-slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ac-pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.anim-fade-up { animation: ac-fade-up 0.65s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.anim-fade-in { animation: ac-fade-in 0.6s ease both; }
+.anim-slide-down { animation: ac-slide-down 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.anim-pop { animation: ac-pop-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade-in, .anim-slide-down, .anim-pop { animation: none !important; }
+}
+
+/* Subtle blueprint grid used by the VS Code handoff hero */
+.grid-paper {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--outline) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--outline) 7%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
 }

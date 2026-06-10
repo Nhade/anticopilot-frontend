@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, CircleDashed } from "lucide-react";
+import { MarkdownInline } from "@/components/learn/markdown-content";
 
 interface TaskItemProps {
   completed: boolean;
@@ -25,7 +26,7 @@ export function TaskItem({ completed, text, active }: TaskItemProps) {
         <div className="w-5 h-5 rounded-full border-2 border-slate-300 dark:border-zinc-700 shrink-0" />
       )}
       <span className={cn("text-sm transition-colors", completed ? "text-slate-400 dark:text-zinc-500 line-through" : active ? "text-slate-900 dark:text-[#98e3f5] font-medium" : "text-slate-600 dark:text-zinc-300")}>
-        {text}
+        <MarkdownInline>{text}</MarkdownInline>
       </span>
     </div>
   );

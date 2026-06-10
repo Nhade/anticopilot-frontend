@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { HelpCircle, CheckCircle2, XCircle } from "lucide-react";
+import { HelpCircle, CheckCircle2, XCircle, Sparkles, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
 import { cn } from "@/lib/utils";
 import type { MultipleChoiceLearningContent } from "@/lib/types";
+import { MarkdownContent, MarkdownInline } from "./markdown-content";
 
 interface QuizCardProps {
   quiz: MultipleChoiceLearningContent;
@@ -23,30 +25,32 @@ export function QuizCard({ quiz }: QuizCardProps) {
   const isCorrect = selected === quiz.correct_option_id;
 
   return (
-    <div>
+    <div className="anim-fade-up">
       <header className="mb-6">
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-500 text-[10px] font-bold uppercase tracking-wider border border-purple-500/20 mb-4">
-          <HelpCircle className="w-3 h-3" />
+        <Chip tone="neutral" icon={HelpCircle} className="mb-4">
           Quiz
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 mb-3 leading-tight">
-          {quiz.title}
+        </Chip>
+        <h1 className="text-[34px] leading-[1.25] font-bold tracking-tight text-ink font-display mb-3">
+          <MarkdownInline className="[&_code]:text-[0.8em]">{quiz.title}</MarkdownInline>
         </h1>
         {quiz.description && (
-          <p className="text-base text-slate-500 dark:text-zinc-400 leading-relaxed">
-            {quiz.description}
+          <p className="text-[17px] text-meta leading-relaxed">
+            <MarkdownInline>{quiz.description}</MarkdownInline>
           </p>
         )}
       </header>
 
-      <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-6">
-        <p className="text-[15px] font-semibold text-slate-800 dark:text-zinc-200 leading-relaxed mb-5">
+      <div className="rounded-2xl border border-outline/50 bg-surface-lowest p-6 shadow-soft">
+        {/* Questions can carry fenced code, so use the block renderer restyled
+            to match the question typography. */}
+        <MarkdownContent className="mb-5 prose-p:text-[16px] prose-p:font-semibold prose-p:text-ink prose-p:leading-relaxed prose-p:font-display prose-p:my-2 prose-p:first:mt-0 prose-p:last:mb-0">
           {quiz.question}
-        </p>
+        </MarkdownContent>
         <div className="space-y-2.5">
           {quiz.options.map((option) => {
             const showAsCorrect = revealed && option.option_id === quiz.correct_option_id;
             const showAsWrong = revealed && selected === option.option_id && !isCorrect;
+            const isSelected = selected === option.option_id;
             return (
               <button
                 key={option.option_id}
@@ -54,48 +58,99 @@ export function QuizCard({ quiz }: QuizCardProps) {
                 onClick={() => !revealed && setSelected(option.option_id)}
                 disabled={revealed}
                 className={cn(
-                  "w-full text-left px-4 py-3 rounded-xl border transition-all flex items-start gap-3 text-[14px]",
+                  "w-full text-left px-4 py-3 rounded-xl border transition-all flex items-start gap-3 text-[14.5px]",
                   showAsCorrect
-                    ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
+                    ? "border-success/55 bg-success/8 text-ink"
                     : showAsWrong
-                    ? "border-red-500/50 bg-red-500/10 text-red-600 dark:text-red-400"
-                    : selected === option.option_id
-                    ? "border-active/50 bg-active/5 text-active"
-                    : "border-slate-200 dark:border-zinc-700 hover:border-active/40 hover:bg-slate-50 dark:hover:bg-zinc-900"
+                    ? "border-red-500/55 bg-red-500/7 text-ink"
+                    : isSelected
+                    ? "border-active/55 bg-active/6 text-ink"
+                    : "border-outline/45 hover:border-active/40 hover:bg-surface-low"
                 )}
               >
-                <span className="font-mono text-xs font-bold mt-1 w-5 shrink-0">{option.option_id}.</span>
-                <span className="flex-1">{option.text}</span>
-                {showAsCorrect && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />}
-                {showAsWrong && <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />}
+                <span
+                  className={cn(
+                    "font-mono text-xs font-bold w-6 h-6 rounded-md flex items-center justify-center shrink-0",
+                    showAsCorrect
+                      ? "bg-success/15 text-success"
+                      : showAsWrong
+                      ? "bg-red-500/15 text-red-500"
+                      : isSelected
+                      ? "bg-active/15 text-active"
+                      : "bg-surface-low text-meta"
+                  )}
+                >
+                  {option.option_id}
+                </span>
+                <span className="flex-1 pt-0.5">
+                  <MarkdownInline>{option.text}</MarkdownInline>
+                </span>
+                {showAsCorrect && (
+                  <CheckCircle2 className="w-[18px] h-[18px] text-success shrink-0 mt-0.5" />
+                )}
+                {showAsWrong && (
+                  <XCircle className="w-[18px] h-[18px] text-red-500 shrink-0 mt-0.5" />
+                )}
               </button>
             );
           })}
         </div>
 
-        {!revealed && (
+        {!revealed ? (
           <Button
             onClick={() => setRevealed(true)}
             disabled={selected === null}
-            className="w-full mt-5 bg-active hover:bg-active/90 text-white h-10 font-semibold"
+            className="w-full mt-5 bg-active hover:bg-active/90 text-white h-10 font-semibold font-display"
           >
-            Check Answer
+            Check answer
           </Button>
-        )}
-
-        {revealed && (
-          <div
-            className={cn(
-              "mt-5 p-4 rounded-xl border text-sm",
-              isCorrect
-                ? "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-300"
-                : "bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-300"
-            )}
-          >
-            <div className="font-bold mb-1.5">
-              {isCorrect ? "Correct!" : "Not quite."}
+        ) : (
+          <div className="mt-5 anim-slide-down">
+            <div
+              className={cn(
+                "rounded-xl border p-4 flex items-start gap-3",
+                isCorrect
+                  ? "bg-success/7 border-success/25"
+                  : "bg-red-500/6 border-red-500/25"
+              )}
+            >
+              {isCorrect ? (
+                <CheckCircle2 className="w-[18px] h-[18px] text-success shrink-0 mt-0.5" />
+              ) : (
+                <XCircle className="w-[18px] h-[18px] text-red-500 shrink-0 mt-0.5" />
+              )}
+              <div
+                className={cn(
+                  "font-bold font-display",
+                  isCorrect ? "text-success" : "text-red-500"
+                )}
+              >
+                {isCorrect ? "Correct!" : "Not quite."}
+              </div>
             </div>
-            <p className="leading-relaxed">{quiz.explanation}</p>
+            {/* AI explanation = agent guidance → purple (DESIGN.md §4) */}
+            <div className="mt-3 rounded-xl border border-ai/25 bg-ai/5 p-4 flex gap-3">
+              <div className="w-8 h-8 rounded-lg bg-ai/12 text-ai flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-ai mb-1 font-display">
+                  Explanation
+                </div>
+                <MarkdownContent className="prose-p:text-[14px] prose-p:text-ink/90 prose-p:leading-relaxed prose-p:my-2 prose-p:first:mt-0 prose-p:last:mb-0">
+                  {quiz.explanation}
+                </MarkdownContent>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setSelected(null);
+                setRevealed(false);
+              }}
+              className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-active hover:underline"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Try again
+            </button>
           </div>
         )}
       </div>

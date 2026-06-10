@@ -197,6 +197,12 @@ export interface ReviewConcept {
   scheduled_days: number;
   reps: number;
   lapses: number;
+  /** ISO timestamp of the last review, if any. */
+  updated_at?: string | null;
+  /** Current memory strength (0..1), computed by the backend FSRS scheduler. */
+  retrievability?: number | null;
+  /** Projected next interval in days (fractional) per grade, from the scheduler. */
+  interval_previews?: { again: number; hard: number; good: number; easy: number } | null;
 }
 
 export interface GeneratedTask {

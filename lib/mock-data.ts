@@ -4,7 +4,7 @@ export type { User, Roadmap, Task, Milestone };
 export const mockUser: User = {
   name: "Alex",
   streak: 14,
-  level: "Intermediate Architect",
+  level: "App Router Apprentice",
 };
 
 export const mockRoadmaps: Roadmap[] = [
@@ -21,7 +21,7 @@ export const mockRoadmaps: Roadmap[] = [
     stats: { reviewsDue: 2, pace: "5h/wk", lastActive: "Today" },
     milestone: "Auth & State",
     progress: 65,
-    linkedProject: "Task Manager App",
+    linkedProject: "Next.js Blog Migration",
     icon: "Target",
     iconColor: "text-active",
     iconBg: "bg-active/10",
@@ -91,17 +91,6 @@ export const mockRoadmaps: Roadmap[] = [
       }
     ]
   }
-];
-
-export const mockNotifications = [
-  { id: 1, type: "review", title: "useEffect dependencies", context: "AuthModal.tsx", rationale: "Repeated issue yesterday" },
-  { id: 2, type: "ai", title: "LocalStorage Limits", context: "Task Manager", rationale: "Suggested by AI" }
-];
-
-export const mockPathUpdates = [
-  { id: 1, type: "refresh", time: "2 hours ago", text: "Inserted dependency-array refresher after repeated useEffect bug." },
-  { id: 2, type: "skip", time: "Yesterday", text: "Skipped Redux because the current project only needs local auth state." },
-  { id: 3, type: "move", time: "3 days ago", text: "Moved Context API ahead of database work to unblock UI development." }
 ];
 
 export const getRoadmapById = (id: string) => mockRoadmaps.find(r => r.id === id);

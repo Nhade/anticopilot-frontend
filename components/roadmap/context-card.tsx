@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { MarkdownInline } from "@/components/learn/markdown-content";
 
 interface ContextCardProps {
   icon: React.ReactNode;
@@ -18,7 +19,7 @@ export function ContextCard({ icon, title, text, highlight }: ContextCardProps) 
         <span className="text-[10px] font-bold text-neutral-meta uppercase tracking-wider">{title}</span>
       </div>
       <div className={cn("text-xs font-semibold text-slate-800 dark:text-zinc-200", highlight)}>
-        {text}
+        <MarkdownInline>{text}</MarkdownInline>
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { TaskItem } from "@/components/task-item";
+import { MarkdownInline } from "@/components/learn/markdown-content";
 import { useStore } from "@/lib/store";
 import { formatEstimatedTime } from "@/lib/format";
 import type { LearningContentItem } from "@/lib/types";
@@ -85,7 +86,7 @@ export function TaskDetailSheet() {
               Active Task
             </span>
             <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-zinc-800/80">
-              <SheetTitle className="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100">{task?.title}</SheetTitle>
+              <SheetTitle className="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100"><MarkdownInline>{task?.title ?? ""}</MarkdownInline></SheetTitle>
               {task?.estimated_hours ? (
                 <div className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-[10px] font-bold text-slate-600 dark:text-zinc-300 shadow-sm whitespace-nowrap">
                   EST. {formatEstimatedTime(task.estimated_hours).toUpperCase()}
@@ -109,7 +110,9 @@ export function TaskDetailSheet() {
               <Target className="w-4 h-4 text-active" /> Objective
             </h4>
             <p className="text-sm text-slate-600 dark:text-zinc-400 leading-relaxed">
-              {task?.subtitle || task?.description || "No description available."}
+              <MarkdownInline>
+                {task?.subtitle || task?.description || "No description available."}
+              </MarkdownInline>
             </p>
           </div>
 
@@ -252,11 +255,11 @@ function LearningContentCard({
           {meta.label}
         </div>
         <div className="text-sm font-bold text-slate-900 dark:text-zinc-100 truncate">
-          {content.title}
+          <MarkdownInline>{content.title}</MarkdownInline>
         </div>
         {content.description && (
           <div className="text-xs text-slate-500 dark:text-zinc-500 truncate mt-0.5">
-            {content.description}
+            <MarkdownInline>{content.description}</MarkdownInline>
           </div>
         )}
       </div>

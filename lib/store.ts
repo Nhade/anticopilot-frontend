@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { User, Roadmap, mockUser, mockRoadmaps, mockNotifications, mockPathUpdates } from './mock-data';
+import { User, Roadmap, mockUser, mockRoadmaps } from './mock-data';
 import { GoalSpec, LearningProfile, ReviewConcept, GeneratedTask, LearningContentItem, SkillPathItem } from './types';
 import * as api from './api-client';
+import { createMockDiscoveryConversation, sendMockDiscoveryMessage } from './discovery-mock';
 import { createGoalResponseToRoadmapFull, transformFullRoadmap, transformRoadmapList } from './transforms';
 
 // NOTE: We previously wrapped this store in zustand's `persist` middleware to keep
@@ -19,19 +20,67 @@ import { createGoalResponseToRoadmapFull, transformFullRoadmap, transformRoadmap
 export type GenerationStatus = 'idle' | 'generating' | 'complete' | 'error';
 export type ContentGenerationStatus = 'idle' | 'generating' | 'complete' | 'error';
 
-export interface Notification {
-  id: number;
-  type: string;
-  title: string;
-  context: string;
-  rationale: string;
+// --- Discovery (conversational roadmap creation) ---
+// Flow per backend PR #13: create a conversation, exchange messages (the agent
+// returns ui_hints describing how to render each question), and when
+// session_complete arrives treat it as "roadmap generation has started" — there
+// is no job-status endpoint, so we poll the roadmap list until the new roadmap
+// shows up with milestones persisted.
+
+export type DiscoveryStatus =
+  | 'idle'
+  | 'starting'
+  | 'awaiting_user'
+  | 'awaiting_agent'
+  | 'generating_roadmap'
+  | 'error';
+
+export interface DiscoveryMessage {
+  role: 'user' | 'agent';
+  text: string;
 }
 
-export interface PathUpdate {
-  id: number;
-  type: string;
-  time: string;
-  text: string;
+export interface DiscoveryState {
+  conversationId: string | null;
+  isMock: boolean;
+  messages: DiscoveryMessage[];
+  uiHints: api.UIHints | null;
+  status: DiscoveryStatus;
+  error: string | null;
+  lastUserMessage: string | null;
+  roadmapJobId: string | null;
+  // Roadmap ids that existed before this session — the generated roadmap is
+  // whichever id later appears that is not in this set.
+  knownRoadmapIds: string[];
+}
+
+const DISCOVERY_INTRO: DiscoveryMessage = {
+  role: 'agent',
+  text: "Hi! I'm here to help turn what you want to learn into a concrete roadmap. What would you like to learn or build?",
+};
+
+const initialDiscoveryState: DiscoveryState = {
+  conversationId: null,
+  isMock: false,
+  messages: [],
+  uiHints: null,
+  status: 'idle',
+  error: null,
+  lastUserMessage: null,
+  roadmapJobId: null,
+  knownRoadmapIds: [],
+};
+
+const DISCOVERY_POLL_INTERVAL_MS = 5000;
+const DISCOVERY_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+
+let discoveryPollTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearDiscoveryPollTimer() {
+  if (discoveryPollTimer) {
+    clearTimeout(discoveryPollTimer);
+    discoveryPollTimer = null;
+  }
 }
 
 interface AppState {
@@ -60,6 +109,17 @@ interface AppState {
   fetchRoadmaps: () => Promise<void>;
   fetchRoadmap: (id: string) => Promise<void>;
   generateRoadmap: (goal: GoalSpec, profile: LearningProfile) => Promise<string>;
+  customizeMilestone: (
+    roadmapId: string,
+    milestoneId: string,
+    payload: api.MilestoneCustomizationPayload
+  ) => Promise<api.MilestoneCustomizationResponse>;
+
+  // Discovery (conversational roadmap creation)
+  discovery: DiscoveryState;
+  startDiscovery: () => Promise<void>;
+  sendDiscoveryMessage: (text: string, options?: { isRetry?: boolean }) => Promise<void>;
+  resetDiscovery: () => void;
 
   // Content Generation State
   contentGenerationStatus: ContentGenerationStatus;
@@ -92,6 +152,15 @@ interface AppState {
     skillpath: SkillPathItem;
     roadmapId: string;
   } | undefined;
+  // Per-lesson completion is client-side (session-only) — the backend tracks
+  // completion per-skillpath. When every lesson in a skillpath is marked, the
+  // skillpath-complete API fires automatically.
+  completedContentIds: Record<string, true>;
+  markLessonComplete: (
+    roadmapId: string,
+    skillpath: SkillPathItem,
+    contentId: string
+  ) => Promise<void>;
 
   // User Data
   user: User;
@@ -103,13 +172,69 @@ interface AppState {
   fetchAllReviews: () => Promise<void>;
   submitReviewGrade: (conceptId: string, grade: 1 | 2 | 3 | 4) => Promise<void>;
   generateReviewTask: (conceptId: string) => Promise<GeneratedTask>;
-
-  // Notifications & Path Updates (stub — will connect to real API later)
-  notifications: Notification[];
-  pathUpdates: PathUpdate[];
 }
 
-export const useStore = create<AppState>((set, get) => ({
+export const useStore = create<AppState>((set, get) => {
+  // Polls the roadmap list until a roadmap not present at session start shows
+  // up with milestones persisted (the roadmap row can land before its
+  // milestones do), then activates it and leaves the discovery flow.
+  const pollForDiscoveryRoadmap = (conversationId: string) => {
+    const startedAt = Date.now();
+
+    const tick = async () => {
+      const { discovery } = get();
+      // Bail out if the session was reset or replaced while we were waiting.
+      if (discovery.conversationId !== conversationId || discovery.status !== 'generating_roadmap') {
+        return;
+      }
+
+      if (discovery.isMock) {
+        // Nothing real to poll — hand the user back to their roadmaps so the
+        // full flow stays walkable without the backend.
+        set({ activeTab: 'roadmap', discovery: { ...initialDiscoveryState } });
+        return;
+      }
+
+      try {
+        const list = await api.fetchRoadmaps();
+        const known = new Set(discovery.knownRoadmapIds);
+        const fresh = list.find((r) => !known.has(r.roadmap_id));
+        if (fresh) {
+          const full = await api.fetchRoadmapById(fresh.roadmap_id);
+          if (full.milestones && full.milestones.length > 0) {
+            await get().fetchRoadmaps();
+            get().setActiveRoadmapId(fresh.roadmap_id);
+            set({ activeTab: 'roadmap', discovery: { ...initialDiscoveryState } });
+            return;
+          }
+        }
+      } catch {
+        // Transient fetch failure — keep polling until the deadline.
+      }
+
+      if (Date.now() - startedAt > DISCOVERY_POLL_TIMEOUT_MS) {
+        const current = get().discovery;
+        if (current.conversationId === conversationId) {
+          set({
+            discovery: {
+              ...current,
+              status: 'error',
+              error:
+                'Roadmap generation is taking longer than expected. It may still finish — check Manage Roadmaps in a bit.',
+            },
+          });
+        }
+        return;
+      }
+
+      discoveryPollTimer = setTimeout(tick, DISCOVERY_POLL_INTERVAL_MS);
+    };
+
+    clearDiscoveryPollTimer();
+    discoveryPollTimer = setTimeout(tick, get().discovery.isMock ? 4000 : DISCOVERY_POLL_INTERVAL_MS);
+  };
+
+  return {
   // Navigation & UI Defaults
   activeTab: 'roadmap',
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -293,6 +418,138 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  customizeMilestone: async (roadmapId, milestoneId, payload) => {
+    const result = await api.customizeMilestone(roadmapId, milestoneId, payload);
+    // Applied edits change milestone fields and may flag skillpaths stale —
+    // refetch so the roadmap view reflects backend truth, not local state.
+    if (result.applied) {
+      await get().fetchRoadmap(roadmapId);
+    }
+    return result;
+  },
+
+  // Discovery Defaults & Actions
+  discovery: { ...initialDiscoveryState },
+
+  startDiscovery: async () => {
+    clearDiscoveryPollTimer();
+    set({
+      activeTab: 'discovery',
+      isSwitcherOpen: false,
+      discovery: { ...initialDiscoveryState, status: 'starting' },
+    });
+
+    // Snapshot the roadmaps that exist before this session so the poller can
+    // recognize the generated one later. Falls back to store state when the
+    // backend is unreachable (mock mode won't poll anyway).
+    let knownRoadmapIds: string[];
+    try {
+      knownRoadmapIds = (await api.fetchRoadmaps()).map((r) => r.roadmap_id);
+    } catch {
+      knownRoadmapIds = get().roadmaps.map((r) => r.roadmap_id || r.id);
+    }
+
+    let conversationId: string;
+    let isMock = false;
+    try {
+      conversationId = await api.createDiscoveryConversation();
+    } catch (error) {
+      // Backend without /v1/discovery routes (PR #13 not merged) or not
+      // running at all — fall back to the scripted mock conversation so the
+      // flow stays demoable.
+      console.warn('Discovery API unavailable, using mock conversation:', error);
+      conversationId = createMockDiscoveryConversation();
+      isMock = true;
+    }
+
+    // Conversation creation returns no agent message, so the opener is ours.
+    set({
+      discovery: {
+        ...initialDiscoveryState,
+        conversationId,
+        isMock,
+        knownRoadmapIds,
+        messages: [DISCOVERY_INTRO],
+        uiHints: { type: 'text_input', options: [] },
+        status: 'awaiting_user',
+      },
+    });
+  },
+
+  sendDiscoveryMessage: async (text, options) => {
+    const discovery = get().discovery;
+    const trimmed = text.trim();
+    if (!trimmed || !discovery.conversationId) return;
+    if (discovery.status !== 'awaiting_user' && discovery.status !== 'error') return;
+
+    set({
+      discovery: {
+        ...discovery,
+        messages: options?.isRetry
+          ? discovery.messages
+          : [...discovery.messages, { role: 'user', text: trimmed }],
+        uiHints: null,
+        status: 'awaiting_agent',
+        error: null,
+        lastUserMessage: trimmed,
+      },
+    });
+
+    try {
+      const response = discovery.isMock
+        ? await sendMockDiscoveryMessage(discovery.conversationId)
+        : await api.sendDiscoveryMessage(discovery.conversationId, trimmed);
+
+      const current = get().discovery;
+      if (current.conversationId !== discovery.conversationId) return;
+
+      const messages: DiscoveryMessage[] = [
+        ...current.messages,
+        { role: 'agent', text: response.message },
+      ];
+
+      if (response.session_complete) {
+        set({
+          discovery: {
+            ...current,
+            messages,
+            uiHints: null,
+            status: 'generating_roadmap',
+            roadmapJobId: response.roadmap_job_id ?? null,
+          },
+        });
+        pollForDiscoveryRoadmap(discovery.conversationId);
+      } else {
+        set({
+          discovery: {
+            ...current,
+            messages,
+            // The composer stays available either way; ui_hints only add
+            // option buttons for choice/confirm turns.
+            uiHints: response.ui_hints ?? { type: 'text_input', options: [] },
+            status: 'awaiting_user',
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Discovery message error:', error);
+      const current = get().discovery;
+      if (current.conversationId !== discovery.conversationId) return;
+      set({
+        discovery: {
+          ...current,
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Discovery agent failed to reply',
+        },
+      });
+    }
+  },
+
+  resetDiscovery: () => {
+    clearDiscoveryPollTimer();
+    set({ discovery: { ...initialDiscoveryState } });
+  },
+
   // Task Detail Defaults
   selectedTaskId: null,
   setSelectedTaskId: (taskId) => set({ selectedTaskId: taskId }),
@@ -303,6 +560,29 @@ export const useStore = create<AppState>((set, get) => ({
   openLearningContent: (contentId) => {
     set({ activeContentId: contentId, activeTab: 'learn', selectedTaskId: null });
   },
+  completedContentIds: {},
+  markLessonComplete: async (roadmapId, skillpath, contentId) => {
+    const current = get().completedContentIds;
+    if (current[contentId]) return;
+    const next: Record<string, true> = { ...current, [contentId]: true };
+    set({ completedContentIds: next });
+
+    const contents = skillpath.learning_contents || [];
+    const allDone =
+      contents.length > 0 && contents.every((c) => next[c.content_id]);
+    if (allDone && skillpath.status !== 'completed') {
+      try {
+        await get().updateSkillpathStatus(roadmapId, skillpath.skillpath_id, 'completed');
+      } catch (error) {
+        // Roll back the local mark so the user can retry the final lesson.
+        const rollback = { ...get().completedContentIds };
+        delete rollback[contentId];
+        set({ completedContentIds: rollback });
+        throw error;
+      }
+    }
+  },
+
   findLearningContent: (contentId) => {
     const { roadmaps } = get();
     for (const roadmap of roadmaps) {
@@ -361,8 +641,5 @@ export const useStore = create<AppState>((set, get) => ({
   generateReviewTask: async (conceptId) => {
     return api.generateTask(conceptId);
   },
-
-  // Notifications & Path Updates — currently mock, will connect to API
-  notifications: mockNotifications,
-  pathUpdates: mockPathUpdates,
-}));
+  };
+});

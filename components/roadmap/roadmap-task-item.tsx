@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { MarkdownInline } from "@/components/learn/markdown-content";
 
 interface RoadmapTaskItemProps {
   id: string;
@@ -60,7 +61,7 @@ export function RoadmapTaskItem({
               : isCompleted ? "text-slate-700 dark:text-zinc-300 line-through decoration-slate-300 dark:decoration-zinc-700"
                 : isReview ? "text-amber-800 dark:text-amber-200"
                   : "text-slate-600 dark:text-zinc-400"
-          )}>{title}</h5>
+          )}><MarkdownInline>{title}</MarkdownInline></h5>
           {type && (
             <span className={cn(
               "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md border",
@@ -73,7 +74,7 @@ export function RoadmapTaskItem({
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-500 dark:text-zinc-500">{subtitle}</p>
+        <p className="text-xs text-slate-500 dark:text-zinc-500"><MarkdownInline>{subtitle}</MarkdownInline></p>
       </div>
       {isActive && (
         <Button variant="ghost" size="sm" className="hidden sm:flex text-active hover:bg-active/10 h-7 text-[10px] font-bold uppercase px-2 pointer-events-none">
