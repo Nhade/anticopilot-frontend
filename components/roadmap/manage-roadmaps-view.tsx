@@ -7,8 +7,8 @@ import {
   AlertTriangle,
   Compass,
   ChevronRight,
-  Info,
   Sparkles,
+  MessagesSquare,
   LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,20 +21,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useStore } from "@/lib/store";
 
 const iconMap: Record<string, LucideIcon> = {
@@ -47,7 +33,6 @@ const iconMap: Record<string, LucideIcon> = {
 
 export function ManageRoadmapsView() {
   const [activeFilter, setActiveFilter] = useState("Active");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const { setActiveRoadmapId, activeRoadmapId, roadmaps, startDiscovery } = useStore();
 
   // Progress bars and milestone labels need each roadmap's details, which the
@@ -133,14 +118,28 @@ export function ManageRoadmapsView() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          startDiscovery(
+                            `I want to adjust the settings for my "${roadmap.title}" roadmap — its weekly pace, time commitment, difficulty, or learning style.`
+                          )
+                        }
+                      >
                         <Settings className="w-4 h-4 mr-2" /> Edit settings
+                        <MessagesSquare className="w-3.5 h-3.5 ml-auto text-ai/70" />
                       </DropdownMenuItem>
                       <DropdownMenuItem>
                         <Target className="w-4 h-4 mr-2" /> Rename
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          startDiscovery(
+                            `Create a new roadmap based on my existing "${roadmap.title}" roadmap, with a few changes I'll describe.`
+                          )
+                        }
+                      >
                         <Code2 className="w-4 h-4 mr-2" /> Duplicate
+                        <MessagesSquare className="w-3.5 h-3.5 ml-auto text-ai/70" />
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem>
@@ -207,104 +206,6 @@ export function ManageRoadmapsView() {
           );
         })}
       </div>
-
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="sm:max-w-[550px] border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-          <DialogHeader>
-            <DialogTitle>Roadmap Settings</DialogTitle>
-            <DialogDescription>
-              Configure the learning flow for this roadmap. Changes apply intelligently to your upcoming milestones.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="goal" className="text-right text-sm font-medium">Goal</label>
-              <input id="goal" defaultValue="Full-Stack Dev" className="col-span-3 flex h-9 w-full rounded-md border border-slate-200 dark:border-zinc-800 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-active dark:bg-zinc-950" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <div className="text-right flex items-center justify-end gap-2">
-                <label htmlFor="pace" className="text-sm font-medium">Weekly pace</label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="w-3.5 h-3.5 text-slate-400 cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      Controls how many new concepts are introduced per session.
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              <div className="col-span-3">
-                <select id="pace" defaultValue="steady" className="flex h-10 w-full rounded-md border border-slate-200 dark:border-zinc-800 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-active dark:bg-zinc-950">
-                  <option value="casual">Slow and steady</option>
-                  <option value="steady">Balanced</option>
-                  <option value="fast">Intense / Fast-track</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="time" className="text-right text-sm font-medium">Weekly Time</label>
-              <div className="col-span-3 flex items-center gap-2">
-                <input id="time" type="number" defaultValue="5" className="flex h-9 w-24 rounded-md border border-slate-200 dark:border-zinc-800 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-active dark:bg-zinc-950" />
-                <span className="text-sm text-slate-500">hours</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="project" className="text-right text-sm font-medium">Linked Project</label>
-              <input id="project" defaultValue="Task Manager App" className="col-span-3 flex h-9 w-full rounded-md border border-slate-200 dark:border-zinc-800 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-active dark:bg-zinc-950" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <div className="text-right flex items-center justify-end gap-2">
-                <label htmlFor="bias" className="text-sm font-medium">Difficulty</label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="w-3.5 h-3.5 text-slate-400 cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      Adjusts the amount of boilerplate and hints provided in VS Code.
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              <div className="col-span-3">
-                <select id="bias" defaultValue="intermediate" className="flex h-10 w-full rounded-md border border-slate-200 dark:border-zinc-800 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-active dark:bg-zinc-950">
-                  <option value="beginner">More guided setup</option>
-                  <option value="intermediate">Balanced</option>
-                  <option value="advanced">Fewer hints, more challenges</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <div className="text-right flex items-center justify-end gap-2">
-                <label htmlFor="style" className="text-sm font-medium">Learning Style</label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="w-3.5 h-3.5 text-slate-400 cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      Determines whether we start with code or conceptual deep-dives.
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              <div className="col-span-3">
-                <select id="style" defaultValue="project-first" className="flex h-10 w-full rounded-md border border-slate-200 dark:border-zinc-800 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-active dark:bg-zinc-950">
-                  <option value="project-first">Project-first (build to learn)</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="concept-first">Concept-first (theory then apply)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSettingsOpen(false)}>Cancel</Button>
-            <Button className="bg-active text-white hover:opacity-90 font-bold" onClick={() => setSettingsOpen(false)}>Save changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
