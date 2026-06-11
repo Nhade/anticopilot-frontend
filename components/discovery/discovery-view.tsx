@@ -31,6 +31,15 @@ export function DiscoveryView() {
     if (canSend) textareaRef.current?.focus();
   }, [canSend]);
 
+  // Grow the composer as input wraps onto new lines, capped at ~6 rows
+  // (max-h-32); beyond that it scrolls.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [draft]);
+
   const submitDraft = () => {
     if (!draft.trim() || !canSend) return;
     sendDiscoveryMessage(draft);
@@ -221,7 +230,7 @@ export function DiscoveryView() {
                     ? "The agent is thinking..."
                     : "Describe what you want to learn..."
               }
-              className="flex-1 resize-none bg-transparent border-0 outline-none text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 px-2 py-2 max-h-32"
+              className="flex-1 resize-none overflow-y-auto bg-transparent border-0 outline-none text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 px-2 py-2 max-h-32"
             />
             <Button
               size="icon"

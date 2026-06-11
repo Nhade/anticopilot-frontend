@@ -16,9 +16,11 @@ import {
   Flame,
   Award,
   CheckCircle2,
+  MessagesSquare,
   LucideIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import { ContextCard } from "./context-card";
 import { ExpandableMilestone } from "./expandable-milestone";
 import { MarkdownInline } from "@/components/learn/markdown-content";
@@ -64,10 +66,9 @@ export function RoadmapView() {
   if (roadmapsLoading && !activeRoadmap?.milestones?.length) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-center space-y-3">
-          <div className="w-8 h-8 border-2 border-active border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-slate-500 dark:text-zinc-400">Loading roadmap...</p>
-        </div>
+        <Loading
+          messages={["Loading your roadmap…", "Gathering milestones…", "Charting your path…"]}
+        />
       </div>
     );
   }
@@ -121,12 +122,17 @@ export function RoadmapView() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => startDiscovery()}
+          onClick={() =>
+            startDiscovery(
+              `Recalculate my "${activeRoadmap?.title ?? "current"}" roadmap based on my recent struggle signals and progress.`
+            )
+          }
           title="Start a guided session with the discovery agent. It reads your accumulated struggle signals and skill-mastery memory, and generates a fresh roadmap version."
           className="border-slate-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 hover:bg-slate-100 dark:hover:bg-zinc-800 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-active"
         >
           <Wand2 className="w-4 h-4 mr-2 text-active" />
           Recalculate based on signals
+          <MessagesSquare className="w-3.5 h-3.5 ml-2 text-ai/70" />
         </Button>
       </div>
 

@@ -15,6 +15,7 @@ import {
 import { isPast, formatDistanceToNow } from "date-fns";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatPill } from "@/components/ui/stat-pill";
 import { DueCard } from "./due-card";
@@ -122,9 +123,10 @@ export function PracticeView() {
   // ---- QUEUE ----
   if (reviewsLoading && allReviews.length === 0 && dueReviews.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-4 pt-20">
-        <div className="w-8 h-8 border-2 border-active border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-meta">Loading practice queue…</p>
+      <div className="flex flex-col items-center justify-center h-full pt-20">
+        <Loading
+          messages={["Loading practice queue…", "Checking what's due…", "Warming up your memory…"]}
+        />
       </div>
     );
   }

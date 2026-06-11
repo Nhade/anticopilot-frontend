@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   ArrowRight,
@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import { Chip } from "@/components/ui/chip";
 import { StrengthBar } from "@/components/ui/strength-bar";
 import { MarkdownContent } from "@/components/learn/markdown-content";
@@ -95,6 +96,7 @@ export function Drill({ concept, position, total, onGraded, onExit }: DrillProps
   const [task, setTask] = useState<GeneratedTask | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [chosen, setChosen] = useState<GradeDef | null>(null);
+  const solutionRef = useRef<HTMLDivElement>(null);
 
   const info = reviewDisplayInfo(concept);
   const tone = concept.source_type === "struggle_signal" ? "review" : "active";
@@ -120,6 +122,52 @@ export function Drill({ concept, position, total, onGraded, onExit }: DrillProps
   }, [generate]);
 
   const reveal = useCallback(() => setPhase("solution"), []);
+
+  // On reveal, bring the solution and grading buttons into view — they often
+  // sit below the fold after a long prompt.
+  useEffect(() => {
+    if (phase !== "solution") return;
+    const el = solutionRef.current;
+    if (!el) return;
+
+    // Scroll the nearest *user-scrollable* ancestor, not scrollIntoView():
+    // the drill card is `overflow-hidden`, so scrollIntoView would scroll that
+    // clip instead of the main content area and the page wouldn't move.
+    const align = () => {
+      const node = solutionRef.current;
+      if (!node) return;
+      let scroller = node.parentElement;
+      while (scroller) {
+        const oy = getComputedStyle(scroller).overflowY;
+        if ((oy === "auto" || oy === "scroll") && scroller.scrollHeight > scroller.clientHeight) break;
+        scroller = scroller.parentElement;
+      }
+      if (!scroller) return;
+      const top =
+        node.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top +
+        scroller.scrollTop -
+        24; // small breathing room above the solution
+      scroller.scrollTo({ top, behavior: "smooth" });
+    };
+
+    align();
+    // Markdown code blocks highlight asynchronously (PrismAsyncLight) and grow
+    // after first paint, so the first scroll can land short — re-align while
+    // the solution settles, then stop.
+    let debounce: ReturnType<typeof setTimeout>;
+    const observer = new ResizeObserver(() => {
+      clearTimeout(debounce);
+      debounce = setTimeout(align, 60);
+    });
+    observer.observe(el);
+    const stop = setTimeout(() => observer.disconnect(), 1800);
+    return () => {
+      clearTimeout(debounce);
+      clearTimeout(stop);
+      observer.disconnect();
+    };
+  }, [phase]);
 
   const grade = useCallback(
     (def: GradeDef) => {
@@ -210,11 +258,14 @@ export function Drill({ concept, position, total, onGraded, onExit }: DrillProps
 
         {/* generating */}
         {phase === "generating" && (
-          <div className="px-7 py-14 flex flex-col items-center gap-3 anim-fade-in">
-            <div className="w-8 h-8 border-2 border-active border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-meta">
-              Generating a fresh drill for this concept…
-            </p>
+          <div className="px-7 py-14 anim-fade-in">
+            <Loading
+              messages={[
+                "Generating a fresh drill…",
+                "Crafting a question…",
+                "Tailoring it to this concept…",
+              ]}
+            />
           </div>
         )}
 
@@ -241,7 +292,7 @@ export function Drill({ concept, position, total, onGraded, onExit }: DrillProps
 
         {/* prompt + solution */}
         {task && (phase === "prompt" || phase === "solution" || phase === "graded") && (
-          <div className="px-7 py-6">
+          <div className="px-7 py-6 anim-rise-in">
             <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-meta mb-3">
               Prompt
             </div>
@@ -266,7 +317,7 @@ export function Drill({ concept, position, total, onGraded, onExit }: DrillProps
             )}
 
             {phase !== "prompt" && (
-              <div className="mt-7 anim-slide-down">
+              <div ref={solutionRef} className="mt-7 anim-slide-down">
                 <div className="rounded-xl border border-success/30 bg-success/5 overflow-hidden">
                   <div className="flex items-center gap-2 px-5 py-2.5 border-b border-success/20 bg-success/8">
                     <CheckCircle2 className="w-[15px] h-[15px] text-success" />

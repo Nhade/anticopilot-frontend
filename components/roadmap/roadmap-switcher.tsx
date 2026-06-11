@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -18,6 +18,7 @@ export function RoadmapSwitcher() {
   } = useStore();
   
   const activeRoadmap = roadmaps.find(r => r.id === activeRoadmapId);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Milestone names and progress come from roadmap details; lazily load them
   // for the list entries that haven't been opened yet.
@@ -29,8 +30,26 @@ export function RoadmapSwitcher() {
       .forEach((r) => fetchRoadmap(r.id));
   }, [isSwitcherOpen]);
 
+  // Dismiss the dropdown on outside click or Escape, matching the Radix menus
+  // used elsewhere. Listeners are only attached while open.
+  useEffect(() => {
+    if (!isSwitcherOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setSwitcherOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSwitcherOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isSwitcherOpen, setSwitcherOpen]);
+
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <Button
         variant="outline"
         onClick={() => setSwitcherOpen(!isSwitcherOpen)}
@@ -81,7 +100,7 @@ export function RoadmapSwitcher() {
               <div 
                 key={roadmap.id}
                 className="p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900/50 cursor-pointer transition-colors"
-                onClick={() => setActiveRoadmapId(roadmap.id)}
+                onClick={() => { setActiveRoadmapId(roadmap.id); setSwitcherOpen(false); }}
               >
                 <div className="flex justify-between items-start mb-1">
                   <h4 className="text-sm font-semibold text-slate-700 dark:text-zinc-300"><MarkdownInline>{roadmap.title}</MarkdownInline></h4>
@@ -105,7 +124,7 @@ export function RoadmapSwitcher() {
               <Sparkles className="w-3.5 h-3.5 mr-1" />
               Create with AI
             </Button>
-            <Button variant="ghost" size="sm" className="text-xs text-slate-600 dark:text-zinc-400 hover:bg-slate-200/50 dark:hover:bg-zinc-800/50 justify-end h-8" onClick={() => setActiveTab("manage-roadmaps")}>
+            <Button variant="ghost" size="sm" className="text-xs text-slate-600 dark:text-zinc-400 hover:bg-slate-200/50 dark:hover:bg-zinc-800/50 justify-end h-8" onClick={() => { setSwitcherOpen(false); setActiveTab("manage-roadmaps"); }}>
               Manage All
             </Button>
           </div>

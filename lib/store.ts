@@ -117,7 +117,7 @@ interface AppState {
 
   // Discovery (conversational roadmap creation)
   discovery: DiscoveryState;
-  startDiscovery: () => Promise<void>;
+  startDiscovery: (opener?: string) => Promise<void>;
   sendDiscoveryMessage: (text: string, options?: { isRetry?: boolean }) => Promise<void>;
   resetDiscovery: () => void;
 
@@ -431,7 +431,7 @@ export const useStore = create<AppState>((set, get) => {
   // Discovery Defaults & Actions
   discovery: { ...initialDiscoveryState },
 
-  startDiscovery: async () => {
+  startDiscovery: async (opener?: string) => {
     clearDiscoveryPollTimer();
     set({
       activeTab: 'discovery',
@@ -474,6 +474,13 @@ export const useStore = create<AppState>((set, get) => {
         status: 'awaiting_user',
       },
     });
+
+    // When launched from an action (Edit settings / Duplicate / Recalculate),
+    // send its opening message on the user's behalf. The discovery agent always
+    // confirms before making any changes, so this just kicks off the
+    // conversation already in context.
+    const trimmedOpener = opener?.trim();
+    if (trimmedOpener) get().sendDiscoveryMessage(trimmedOpener);
   },
 
   sendDiscoveryMessage: async (text, options) => {
